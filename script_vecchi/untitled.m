@@ -1,0 +1,1 @@
+load('curva-ps-11_07_2024.txt')
