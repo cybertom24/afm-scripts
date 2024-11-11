@@ -30,7 +30,7 @@ z = zu;
 figure;
 grid on;
 hold on;
-legend show;
+legend show; 
 scatter(z, d, 'Marker', '.', 'SizeData', marker_size, 'DisplayName','curva DZ [og]');
 title('Curva DZ originale vs filtrate');
 xlabel('z [nm]');

@@ -8,6 +8,8 @@ addpath './funzioni/';
 k = 0.5;
 R = 35e-9;
 v = 0.22;
+n = 15;
+p = 25;
 
 % Caratteristica mappa
 L = 2;
@@ -18,8 +20,8 @@ L = 2;
 
 
 % Calcola la mappa
-Emap = calcola_mappa_E_fitting('./dati/map29.txt', slope, k, R, v, 15, 50);
-%Emap = calcola_mappa_E_fitting('./dati/map48.txt', slope, k, R, v, 15, 100);
+Emap = calcola_mappa_E_fitting('./dati/map29.txt', slope, k, R, v, n, p);
+%Emap = calcola_mappa_E_fitting('./dati/map48.txt', slope, k, R, v, n, p);
 % Rendi in MPa
 Emap = Emap / 1e6;
 % Prima di mostrarla pero' ribalta le y

@@ -18,8 +18,8 @@
 function [E, Erid, u_E, u_Erid] = calcola_E_modH_lineare_fitting(z, d, k, R, v, n, p)
     
     % Ritrasforma in nm (spero si possa togliere prima o poi)
-    z = z * 1e9;
-    d = d * 1e9;
+    % z = z * 1e9;
+    % d = d * 1e9;
     
     % Calcola la derivata prima
     [dz, dd] = derivata_locale(z, d, n);
@@ -82,8 +82,8 @@ function [E, Erid, u_E, u_Erid] = calcola_E_modH_lineare_fitting(z, d, k, R, v, 
             d_fit = d_fit - d_min;
 
             % Converti in m
-            z_fit = z_fit * 1e-9;
-            d_fit = d_fit * 1e-9;
+            % z_fit = z_fit * 1e-9;
+            % d_fit = d_fit * 1e-9;
 
             % Calcola h
             h_fit = (-z_fit) - d_fit;
