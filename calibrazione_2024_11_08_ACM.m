@@ -13,25 +13,33 @@ addpath './funzioni/';
 % k va da 0.05 N/m a 2.3 N/m
 % R è < 35 nm
 % Provo con
-k = 2.3;
-R = 8e-9;
-v = 0.22;
+% k = 2.3;
+% R = 8e-9;
+% v = 0.22;
 % Esce Eldpe = 16.897 MPa +- 7.0540 MPa
 %      Eps   = 2029.0 MPa +- 461.02 MPa
 % Speriamo vadano bene
 
+% Riprovo con 
+k = 0.5;
+R = 8e-9;
+v = 0.22;
+
 % Opzioni di fitting
-n = 15;
-p = 25;
+n = 25;
+Rsq_min = 0.99;
+% p = 25;
 
 % Caratteristica mappa
 L = 2;  % um
 
 % Recupera la slope di calibrazione
 [~, slope] = calibra('./dati/zaffiro-2024_11_08-ACM.txt');
+% [~, slope] = calibra('./dati/zaffiro-2024_10_31-1001pt-5x.txt');
 
 % Calcola la mappa
-Emap = calcola_mappa_E_fitting('./dati/map56.txt', slope, k, R, v, n, p);
+Emap = calcola_mappa_E_intervallo('./dati/map56.txt', slope, k, R, v, n, Rsq_min);
+% Emap = calcola_mappa_E_intervallo('./dati/map48.txt', slope, k, R, v, n, Rsq_min);
 % Rendi in MPa
 Emap = Emap / 1e6;
 % Prima di mostrarla pero' ribalta le y
@@ -42,31 +50,7 @@ numero_NaN = sum(isnan(Emap), 'all');
 tot = length(Emap)^2;
 fprintf('Numero di errori: %d. Successo: %.2f\n', numero_NaN, ((tot - numero_NaN) * 100 / tot) );
 
-% Crea gli assi x e y
-n_pixel = length(Emap);
-l_pixel = L / n_pixel;
-x = linspace(l_pixel / 2, L - l_pixel / 2, n_pixel);
-y = linspace(l_pixel / 2, L - l_pixel / 2, n_pixel);
-
-figure;
-imagesc(x, y, Emap); % Indica gli assi prima della matrice
-axis image; % imposta l'aspect ratio giusto
-%set(gca, 'Units', 'pixels', 'Position', [100 100 400 400]); % [left, bottom, width, height]   imposta la dimensione a 400x400 px
-% Imposta a direzione dell'asse verticale come dal basso verso l'alto 
-% Non è più necessario flippare l'immagine
-set(gca, 'YDir', 'normal');
-colormap(jet);
-cb = colorbar;
-%clim([0, 4000]);
-% Imposta come scala quella logaritmica
-set(gca,'ColorScale','log'); 
-xlabel('x [{\mu}m]');
-ylabel('y [{\mu}m]');
-%clabel('E [MPa]');
-title('Mappa del modulo elastico del campione PS-LDPE-12M');
-ylabel(cb, 'E [MPa]'); % Imposta la label della colorbar
-xticks(0:0.25:L);
-yticks(0:0.25:L);
+mostra_mappa_E(Emap, L, 'MPa', 'Distribuzione modulo elastico PS-LDPE-12M');
 
 %{
 % Ricrea l'immagine e salvala
@@ -85,7 +69,7 @@ saveas(gcf,'mappa-E-psldpe','png');
 %% --- Istogramma della mappa ---
 
 E_lim = 300;
-bin_size = 50;
+bin_size = 10;
 
 figure;
 hold on;

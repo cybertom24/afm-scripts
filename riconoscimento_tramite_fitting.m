@@ -1,6 +1,6 @@
 clc;
 clear;
-close all;
+% close all;
 
 addpath ./funzioni/
 
@@ -16,7 +16,7 @@ marker_size = 100;
 [~, slope] = calibra('./dati/zaffiro-2024_10_31-1001pt-5x.txt');
 
 % Carica la curva di forza
-[~, ~, zu, Nfu] = load_curva_forza('./dati/map48-ldpe.txt');
+[~, ~, zu, Nfu] = load_curva_forza('./dati/map48-ps.txt');
 
 % Rimuovi il background
 [Nfu_nob, b] = rimuovi_background(zu, Nfu, max(zu) * 0.80, max(zu));

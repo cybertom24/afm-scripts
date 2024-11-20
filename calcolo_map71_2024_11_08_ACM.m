@@ -7,13 +7,17 @@ clear;
 addpath './funzioni/';
 
 % Caratteristiche punta e materiale
-k = 2.3;
-R = 8e-9;
-v = 0.5;
+% k = 2.3;
+% R = 8e-9;
+% v = 0.5;
+k = 0.5;
+R = 35e-9;
+v = 0.22;
 
 % Impostazioni fitting
 n = 15;
-p = 25;
+% p = 25;
+Rsq_min = 0.95;
 
 % Caratteristica mappa
 L = 2;
@@ -22,7 +26,8 @@ L = 2;
 [~, slope] = calibra('./dati/zaffiro-2024_11_08-ACM.txt');
 
 % Calcola la mappa
-Emap = calcola_mappa_E_fitting('./dati/map71.txt', slope, k, R, v, n, p);
+% Emap = calcola_mappa_E_fitting('./dati/map71.txt', slope, k, R, v, n, p);
+Emap = calcola_mappa_E_intervallo('./dati/map71.txt', slope, k, R, v, n, Rsq_min);
 % Rendi in MPa
 Emap = Emap / 1e6;
 % Prima di mostrarla pero' ribalta le y
