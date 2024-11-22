@@ -1,9 +1,18 @@
-function mostra_mappa_E(Emap, varargin)
-%MOSTRA_MAPPA_E Mostra la mappa del modulo elastico con titolo, assi,
-%colori e altro
-%   Emap = mappa da visualizzare
-%   L = grandezza mappa (in um)
-%   titolo = titolo della figura
+function show_E_map(Emap, varargin)
+    % Shows Young's modulus map as a new figure window.
+    % ----
+    % Arguments:
+    % - Mandatory:
+    % Emap [x] = matrix containing Young's modulus map in any unity of
+    % measure.
+    % - Optional:
+    % L [um] = Edge size of the map in micrometers. Default: 1 um.
+    % um = unity of measure string. Default: 'Pa'.
+    % title_s = title_s of the map. Default: 'Elastic modulus map'.
+    % cmap = color map to be used. Default: jet.
+    %
+    % Returns:
+    % slope = slope calculated from the curve
     
     nargin = length(varargin);
 
@@ -12,14 +21,14 @@ function mostra_mappa_E(Emap, varargin)
         L = varargin{1};  
     end
 
-    uma = 'Mappa del modulo elastico';
+    um = 'Pa';
     if nargin >= 2
-        uma = varargin{2};
+        um = varargin{2};
     end
     
-    titolo = 'Pa';
+    title_s = 'Elastic modulus map';
     if nargin >= 3
-        titolo = varargin{3};
+        title_s = varargin{3};
     end
 
     cmap = jet;
@@ -27,7 +36,7 @@ function mostra_mappa_E(Emap, varargin)
         cmap = varargin{4};
     end
 
-    % Crea gli assi x e y
+    % Create the map's axis
     n_pixel = length(Emap);
     l_pixel = L / n_pixel;
     x = linspace(l_pixel / 2, L - l_pixel / 2, n_pixel);
@@ -45,8 +54,8 @@ function mostra_mappa_E(Emap, varargin)
     % clim([0, 4000]);
     xlabel('x [{\mu}m]');
     ylabel('y [{\mu}m]');
-    ylabel(cb, ['E [' uma ']']); % Imposta la label della colorbar
-    title(['' titolo]);
+    ylabel(cb, ['E [' um ']']); % Imposta la label della colorbar
+    title(['' title_s]);
     xticks(linspace(0, L, 5));
     yticks(linspace(0, L, 5));
 
@@ -55,4 +64,3 @@ function mostra_mappa_E(Emap, varargin)
     % Rendi i NaN trasparenti
     set(img, 'AlphaData', ~isnan(Emap)); % Alpha 1 per i valori, 0 per i NaN
 end
-
