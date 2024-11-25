@@ -1,4 +1,4 @@
-function [Emap, Eridmap] = calculate_E_map(filename, slope, k, R, v, n, Rsq_min)
+function [Emap, Eridmap] = calculate_E_map(filename, slope, k, R, v, n, Rsq_min, b_start)
     % Calculates Young's modulus' map from file containing the points taken
     % by AFM software.
     % ----
@@ -9,9 +9,11 @@ function [Emap, Eridmap] = calculate_E_map(filename, slope, k, R, v, n, Rsq_min)
     % v [ ] = Material's Poisson's ratio. If unknown, put 1.
     % n [ ] = Moving Average Filter's size in points. It is also used to 
     % define the derivative's window's size.
-    % Rsq_min [] = Every point fit must have a Rsq value higher than this. 
+    % Rsq_min [0:1] = Every point fit must have a Rsq value higher than this. 
     % By putting Rsq_min = 0 no point is excluded, even the ones with 
     % terrible (Rsq ~ 0) fit.
+    % b_start [0:1] = Percentage of the curve from which to start fitting 
+    % the background. 
     % Returns:
     % Emap [Pa] = Matrix containing Young's modulus computed for every 
     % curve. If the fit failed or it's not acceptable (Rsq < Rsq_min) 
@@ -51,7 +53,11 @@ function [Emap, Eridmap] = calculate_E_map(filename, slope, k, R, v, n, Rsq_min)
     for i = 1:1:dim
         for j = 1:1:dim
             curva = (i-1)*dim + j;
-            [Emap(i,j), Eridmap(i,j)] = calculate_E_curve(z, (Nf_list(:, curva) / slope) * 1e-9, k, R, v, n, Rsq_min);
+
+            d = (Nf_list(:, curva) / slope) * 1e-9;
+            % Remove background
+            d = remove_background(z, d, b_start * max(z), +Inf);
+            [Emap(i,j), Eridmap(i,j)] = calculate_E_curve(z, d, k, R, v, n, Rsq_min);
         end
     end
 end 
