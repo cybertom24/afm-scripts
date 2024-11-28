@@ -45,7 +45,7 @@ function img = add_height_map_to_figure(Hmap, varargin)
     img = imagesc(x, y, Hmap); % Indica gli assi prima della matrice
     axis image; % imposta l'aspect ratio giusto
     set(gca, 'YDir', 'normal');
-    colormap(cmap);
+    colormap(gca, cmap);
     cb = colorbar;
     xlabel('x [{\mu}m]');
     ylabel('y [{\mu}m]');

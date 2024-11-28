@@ -48,7 +48,7 @@ function img = add_E_map_to_figure(Emap, varargin)
     % Imposta a direzione dell'asse verticale come dal basso verso l'alto
     % Non è più necessario flippare l'immagine
     set(gca, 'YDir', 'normal');
-    colormap(cmap);
+    colormap(gca, cmap);
     cb = colorbar;
     % clim([0, 4000]);
     xlabel('x [{\mu}m]');

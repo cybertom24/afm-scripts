@@ -4,6 +4,9 @@ clear;
 
 addpath ./funzioni
 addpath ./app/functions/
+addpath ./more-colormaps/
+
+% NON VA BENE PERCHE' LE CURVE NON HANNO LA PORZIONE DI BACKGROUND
 
 % Caratteristiche punta e materiale
 k = 0.5;    % [N/m]
@@ -38,7 +41,7 @@ figure;
 % Carica la mappa delle z convertendo in nm
 Hmap = load_height_map('./dati/exp111/img12.txt') * 1e3;
 subplot(1, 3, 1);
-add_height_map_to_figure(Hmap, L, 'nm', 'Height map of P_1', bone);
+add_height_map_to_figure(Hmap, L, 'nm', 'Height map of P_1', slanCM('heat'));
 
 subplot(1, 3, 2);
 add_E_map_to_figure(Emap, L, 'MPa', 'Elastic modulus map of P_1');
@@ -68,7 +71,7 @@ figure;
 % Carica la mappa delle z convertendo in nm
 Hmap = load_height_map('./dati/exp111/img15.txt') * 1e3;
 subplot(1, 3, 1);
-add_height_map_to_figure(Hmap, L, 'nm', 'Height map of P_2', bone);
+add_height_map_to_figure(Hmap, L, 'nm', 'Height map of P_2', slanCM('heat'));
 
 subplot(1, 3, 2);
 add_E_map_to_figure(Emap, L, 'MPa', 'Elastic modulus map of P_2');
@@ -98,7 +101,7 @@ figure;
 % Carica la mappa delle z convertendo in nm
 Hmap = load_height_map('./dati/exp111/img18.txt') * 1e3;
 subplot(1, 3, 1);
-add_height_map_to_figure(Hmap, L, 'nm', 'Height map of P_3', bone);
+add_height_map_to_figure(Hmap, L, 'nm', 'Height map of P_3', slanCM('heat'));
 
 subplot(1, 3, 2);
 add_E_map_to_figure(Emap, L, 'MPa', 'Elastic modulus map of P_3');
@@ -128,7 +131,7 @@ figure;
 % Carica la mappa delle z convertendo in nm
 Hmap = load_height_map('./dati/exp111/img21.txt') * 1e3;
 subplot(1, 3, 1);
-add_height_map_to_figure(Hmap, L, 'nm', 'Height map of P_4', bone);
+add_height_map_to_figure(Hmap, L, 'nm', 'Height map of P_4', slanCM('heat'));
 
 subplot(1, 3, 2);
 add_E_map_to_figure(Emap, L, 'MPa', 'Elastic modulus map of P_4');
