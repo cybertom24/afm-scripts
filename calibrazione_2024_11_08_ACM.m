@@ -21,24 +21,24 @@ addpath './funzioni/';
 % Speriamo vadano bene
 
 % Riprovo con 
-k = 0.5;
-R = 8e-9;
+k = 2.3;
+R = 17e-9;
 v = 0.22;
 
 % Opzioni di fitting
-n = 25;
-Rsq_min = 0.99;
+n = 15;
+Rsq_min = 0.95;
 % p = 25;
 
 % Caratteristica mappa
 L = 2;  % um
 
 % Recupera la slope di calibrazione
-[~, slope] = calibra('./dati/zaffiro-2024_11_08-ACM.txt');
+[~, slope] = calibra('./dati/exp84/curve52.txt');
 % [~, slope] = calibra('./dati/zaffiro-2024_10_31-1001pt-5x.txt');
 
 % Calcola la mappa
-Emap = calcola_mappa_E_intervallo('./dati/map56.txt', slope, k, R, v, n, Rsq_min);
+Emap = calculate_E_map('./dati/exp84/map56.txt', slope, k, R, v, n, Rsq_min, 0.80);
 % Emap = calcola_mappa_E_intervallo('./dati/map48.txt', slope, k, R, v, n, Rsq_min);
 % Rendi in MPa
 Emap = Emap / 1e6;
@@ -68,8 +68,8 @@ saveas(gcf,'mappa-E-psldpe','png');
 
 %% --- Istogramma della mappa ---
 
-E_lim = 300;
-bin_size = 10;
+E_lim = 500;
+bin_size = 50;
 
 figure;
 hold on;
@@ -84,7 +84,7 @@ title('Distribuzione del modulo elastico');
 % Quindi con E < E_lim
 Emap_ldpe = Emap(Emap < E_lim);
 Emap_ldpe = Emap_ldpe(:);
-bin_size = 10;
+bin_size = 5;
 
 figure;
 hold on;

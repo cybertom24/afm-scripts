@@ -1,4 +1,4 @@
-function [Emap, Eridmap] = calculate_E_map(filename, slope, k, R, v, n, Rsq_min, b_start)
+function [Emap, Eridmap, z, good_curves] = calculate_E_map(filename, slope, k, R, v, n, Rsq_min, b_start)
     % Calculates Young's modulus' map from file containing the points taken
     % by AFM software.
     % ----
@@ -21,6 +21,9 @@ function [Emap, Eridmap] = calculate_E_map(filename, slope, k, R, v, n, Rsq_min,
     % Eridmap [Pa] = Matrix containing Young's modulus computed for every 
     % curve. Usefull if the Poisson's ratio is unknown or if tip's elastic 
     % modulus is comparable with the material's.
+    % z [m] = z axis for the good_curves. This is an horizontal vector.
+    % good_curves [m] = Matrix containing all of the curves that got a positive
+    % result. The curves are horizontal vectors.
 
     % Load map's curves
     data = load(filename);
@@ -50,6 +53,7 @@ function [Emap, Eridmap] = calculate_E_map(filename, slope, k, R, v, n, Rsq_min,
     dim = ceil( sqrt(rows - 1) );
     Emap = zeros([dim dim]);
     Eridmap = zeros([dim dim]);
+    good_curves = [];
     for i = 1:1:dim
         for j = 1:1:dim
             curva = (i-1)*dim + j;
@@ -58,6 +62,13 @@ function [Emap, Eridmap] = calculate_E_map(filename, slope, k, R, v, n, Rsq_min,
             % Remove background
             d = remove_background(z, d, b_start * max(z), +Inf);
             [Emap(i,j), Eridmap(i,j)] = calculate_E_curve(z, d, k, R, v, n, Rsq_min);
+
+            if ~isnan(Emap(i, j))
+                % Save the curve
+                good_curves = [good_curves; d'];
+            end
         end
     end
+    
+    z = z';
 end 

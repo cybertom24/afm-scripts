@@ -5,7 +5,7 @@ close all;
 addpath ./funzioni/
 
 k = 0.5;    % N/m
-R = 8e-9;  % m
+R = 35e-9;  % m
 v = 0.5;   % 1
 
 marker_size = 100;
@@ -14,39 +14,46 @@ marker_size = 100;
 
 % Calibra lo strumento
 % [~, slope] = calibra('./dati/zaffiro_DZ_2024_10_24_801pt_2mspt.txt');
-[~, slope] = calibra('./dati/zaffiro-2024_10_31-1001pt-5x.txt');
+% [~, slope] = calibra('./dati/zaffiro-2024_10_31-1001pt-5x.txt');
+% slope = 350;
+[~, slope] = calibra('./dati/exp111/curve29.txt');
 
 % Carica la curva di forza
 % [~, ~, zu, Nfu] = load_curva_forza('./dati/curva-ldpe.txt');
 % [~, ~, zu, Nfu] = load_curva_forza('./dati/map48-ps.txt');
-[~, ~, zu, Nfu] = load_curva_forza('./dati/zaffiro-2024_10_31-1001pt-5x.txt');
+% [~, ~, zu, Nfu] = load_curva_forza('./dati/zaffiro-2024_10_31-1001pt-5x.txt');
+[~, ~, z_og, Nf] = load_force_curve('./dati/exp111/curve-map48.txt');
+
+% [~, ~, z_old, Nf_old] = load_force_curve('./dati/curva-ACM-12_07_2024.txt');
+%z_og = linspace(min(z_old), max(z_old), 401);
+%Nf = interp1(z_old, Nf_old, z_og, 'spline');
 
 % Rimuovi il background
-[Nfu_nob, b] = rimuovi_background(zu, Nfu, max(zu) * 0.80, max(zu));
+[Nf_nob, b] = rimuovi_background(z_og, Nf, max(z_og) * 0.80, max(z_og));
 
-d = Nfu_nob / slope * 1e-9;
-z = zu * 1e-9;
+d_og = Nf_nob / slope * 1e-9;
+z_og = z_og * 1e-9;
 
-%d = flip(d);
-%z = flip(z);
+%d_og = flip(d_og);
+%z_og = flip(z_og);
 
 figure;
 grid on;
 hold on;
 legend show; 
-scatter(z, d, 'Marker', '.', 'SizeData', marker_size, 'DisplayName','curva DZ [og]');
+scatter(z_og, d_og, 'Marker', '.', 'SizeData', marker_size, 'DisplayName','curva DZ [og]');
 title('Curva DZ originale vs filtrate');
 xlabel('z [m]');
 ylabel('d [m]');
 
 % Ripulisci il grafico
 % Gira i vettori se è necessario
-[~, i_max] = max(d);
-[~, i_min] = min(d);
+[~, i_max] = max(d_og);
+[~, i_min] = min(d_og);
 
 if i_max < i_min
-    d = flip(d);
-    z = flip(z);
+    d_og = flip(d_og);
+    z_og = flip(z_og);
 end
 
 % --- Moving Average Filter ---
@@ -57,10 +64,10 @@ filter_length = 10;
 % peso e quindi calcola la media.
 coefficients = ones(1, filter_length) / filter_length;
 % Esegui il filtraggio
-d_mov_avg = filter(coefficients, 1, d);
+d_mov_avg = filter(coefficients, 1, d_og);
 % Compensa il ritardo di (filter_length - 1) / 2
 fDelay = (length(coefficients) - 1) / 2;
-z_mov_avg = z + abs(z(1) - z(2)) * fDelay;
+z_mov_avg = z_og + abs(z_og(1) - z_og(2)) * fDelay;
 
 plot(z_mov_avg, d_mov_avg, 'DisplayName','curva DZ [ripulita]');
 
@@ -281,3 +288,32 @@ Erid = (Rsq_best_m ^ 1.5) * 0.75 * k / sqrt(R);
 E = Erid * (1 - v^2);
 
 fprintf('(Rsq) E calcolato: %d\n', E);
+
+close all;
+
+figure;
+grid on;
+hold on;
+legend('show', 'location', 'north');
+xlabel('z [nm]');
+ylabel('d [nm]');
+scatter(z_og * 1e9, d_og * 1e9, 'DisplayName', 'original force curve', 'Marker', '.', 'SizeData', 200);
+plot(z * 1e9, d * 1e9, 'DisplayName', 'denoised force curve', 'LineWidth', 2);
+plot(dx * 1e9, dy, 'DisplayName', 'local derivative', 'LineWidth', 2);
+% plot(z * 1e9, gradient(d) ./ gradient(z), 'DisplayName', '{\partial}F', 'LineWidth', 2)
+
+xline(z(i_inizio) * 1e9, 'k--', 'DisplayName', 'start region', 'LineWidth', 2);
+xline(z(i_fine) * 1e9, 'k--', 'DisplayName', 'end region', 'LineWidth', 2);
+
+xline(z(Rsq_best_start) * 1e9, 'k', 'DisplayName', 'start fit', 'LineWidth', 2);
+xline(z(Rsq_best_stop + Rsq_best_start - 1) * 1e9, 'k', 'DisplayName', 'end fit', 'LineWidth', 2);
+
+figure;
+grid on;
+hold on;
+legend show;
+xlabel('h [nm]');
+ylabel('F^{2/3} [nN^{2/3}]');
+
+scatter(h_fit_r * 1e9, d_lin_r * (k * 1e9)^(2/3), 'Marker', '.', 'SizeData', marker_size, 'DisplayName', 'linearized curve', 'SizeData', 200);
+plot(h_fit_r * 1e9, (Rsq_best_m * h_fit_r + Rsq_best_q) * (k * 1e9)^(2/3), 'DisplayName', 'linear fit', 'LineWidth', 2);

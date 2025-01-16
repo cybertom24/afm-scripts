@@ -1,0 +1,16 @@
+punta: 0.5 N/m, 35nm
+slope = 377.5 au/nm
+Curve ottenute su ACM EXP84 in data 08/11/2024
+Sono contenute nel database 18.10.2024.adb e sono le curve 61, 62, 63, 64 e 65.
+La durata dell'acquisizione è indicata nella tabella che appare quando si visualizza la curva in AIST.
+Le mappe successive sono state acquisite con passT di 2s ma contengono molte curve inutilizzabili.
+
+Il calcolo del modulo elastico è risultato in:
+60) E: 93.249299 MPa
+61) E: 107.242671 MPa
+62) E: 48.450370 MPa
+63) E: 200.287363 MPa
+64) E: 96.561974 MPa
+65) E: 91.511261 MPa
+
+Effettivamente le curve, sebbene simili visimamente, riportano valori più alti del modulo elastico quando aumenta la velocità di acquisizione.

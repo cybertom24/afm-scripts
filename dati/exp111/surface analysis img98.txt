@@ -1,0 +1,13 @@
+Amount = 65536
+Average value = 1.50359 µm
+Maximum = 3.40802 µm
+Minimum = 0 µm
+Median = 1.51848 µm
+Ra = 0.424114 µm
+Rms = 0.553683 µm
+Skew = 0.0961678
+Kurtosis = -0.187559
+Surface area = 991.806 µm²
+Projected Area = 892.982 µm²
+Inclination θ  = 0.193945°
+Inclination φ  = 19.3617°

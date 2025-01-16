@@ -2,11 +2,11 @@ clc;
 clear;
 close all;
 
-addpath ./funzioni/;
+addpath ../funzioni/;
 
-dir_E84 = 'C:\Users\savol\Documents\Università\Tesi\Dati\RAMAN\ACM_EXP84\';
-dir_E27 = 'C:\Users\savol\Documents\Università\Tesi\Dati\RAMAN\EXP27ORG\';
-dir_E85 = 'C:\Users\savol\Documents\Università\Tesi\Dati\RAMAN\ISO_EXP85\';
+dir_E84 = 'C:\Users\savol\Documents\Università\Tesi - Triennale\Dati\RAMAN\ACM_EXP84\';
+dir_E27 = 'C:\Users\savol\Documents\Università\Tesi - Triennale\Dati\RAMAN\EXP27ORG\';
+dir_E85 = 'C:\Users\savol\Documents\Università\Tesi - Triennale\Dati\RAMAN\ISO_EXP85\';
 
 lineWidth = 1;
 

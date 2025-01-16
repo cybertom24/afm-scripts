@@ -18,11 +18,17 @@ function [E, Erid, u_E, u_Erid] = calculate_E_curve(z, d, k, R, v, n, Rsq_min)
     % terrible (Rsq ~ 0) fit.
     % Returns:
     % E [Pa] = Young's modulus computed. If the fit failed or it's not
-    % acceptable (Rsq < Rsq_min) the value is NaN.
+    % acceptable (Rsq < Rsq_min) the value is NaN. +Inf means that no
+    % elastic data is present in the curve, meaning the tip has not
+    % indented the surface.
     % Erid [Pa] = Reduced Young's modulus computed. Usefull if the
     % Poisson's ratio is unknown or if tip's elastic modulus is comparable
     % with the material's.
-
+    
+  
+    % Absolute minimum points to begin the fit. Under this number of points
+    % the fit is considered Inf.
+    min_pt = 5;
 
     % -- Clean curve --
 
@@ -35,19 +41,8 @@ function [E, Erid, u_E, u_Erid] = calculate_E_curve(z, d, k, R, v, n, Rsq_min)
         z = flip(z);
     end
 
-    % --- Moving Average Filter ---
-    % Create coefficients' vector in order to calculate the average (point
-    % has equal weight)
-    coefficients = ones(1, n) / n;
-    
-    d_mov_avg = filter(coefficients, 1, d);
-    % compensate filter's native delay (filter_length - 1) / 2
-    fDelay = (length(coefficients) - 1) / 2;
-    z_mov_avg = z + abs(z(1) - z(2)) * fDelay;
-
-    % From now on work on the clean curve
-    z = z_mov_avg;
-    d = d_mov_avg;
+    % Smooth the curve and work only on that
+    [z, d] = moving_average_filter(z, d, n);
 
     % Compute first derivative
     [dx, dy] = local_derivative(z, d, n);
@@ -70,19 +65,26 @@ function [E, Erid, u_E, u_Erid] = calculate_E_curve(z, d, k, R, v, n, Rsq_min)
         % Find the most similar z(i) to z_end
         [~, i_end] = min( abs(z - z_end) );
     end
-
+    
     % Those are the limits of the fit region. There is no point to fit 
     % outside those limits.
     
-    % Calculate the minimum points to fit
     h_max = 0.10 * R;
-    delta_z = abs(z(1) - z(2));
-    min_pt = h_max / delta_z;
-    
+
     % Set the fit as invalid if there are too few points to be fitted
     if abs(i_start - i_end) < min_pt
-        E = NaN;
-        Erid = NaN;
+        % This means that the curve has not indented the surface enough
+        % The elastic modulus is then considered +Inf
+        E = +Inf;
+        Erid = +Inf;
+
+        % fprintf('exp: %f, found: %f\n', min_pt, abs(i_start - i_end));
+        % figure;
+        % grid on;
+        % yyaxis left;
+        % plot(z, d);
+        % yyaxis right;
+        % plot(dx, dy);
         return;
     end
 
@@ -100,11 +102,13 @@ function [E, Erid, u_E, u_Erid] = calculate_E_curve(z, d, k, R, v, n, Rsq_min)
 
     % Modify fit's begin and end in order to find the best region to fit
 
-    Rsq_best = 0;
-    Rsq_best_start = 0;
-    Rsq_best_stop = 0;
-    Rsq_best_m = 0;
-    Rsq_best_q = 0;
+    best.val = 0;
+    best.start = 0;
+    best.stop = 0;
+    best.m = 0;
+    best.q = 0;
+    best.h = 0;
+    best.dlin = 0;
 
     for i = i_start:1:(i_end - min_pt)
         % i defines the begin of the fit region
@@ -120,7 +124,7 @@ function [E, Erid, u_E, u_Erid] = calculate_E_curve(z, d, k, R, v, n, Rsq_min)
         % Compute identation
         h_fit = (-z_fit) - d_fit;
 
-        % h(1) = 0 while h(i_max) = h_max. Find that point
+        % Since h(1) = 0, find i_max such that h(i_max) = h_max
         [~, i_max] = min(abs(h_fit - h_max));
 
         % Shrink again the fit region
@@ -135,36 +139,60 @@ function [E, Erid, u_E, u_Erid] = calculate_E_curve(z, d, k, R, v, n, Rsq_min)
         end
 
         % Linearize
-        d_lin = potenza(d2fit, 2/3);
+        d_lin = custom_power(d2fit, 2/3);
 
         % Fit
         [m, q, Rsq] = fit_line(h2fit, d_lin);
 
-        if m <= 0 || isnan(m) || Rsq > 1
-            % Cannot be accepted
+        if m <= 0 || isnan(m) || Rsq > 1 || ~isreal(Rsq) || ~isreal(m)
+            % Cannot be accepted if:
+            % m is negative, zero, NaN or complex
+            % Rsq is greater than 1 or complex
             continue;
         end
 
         % Compare the fit goodness
-        if Rsq > Rsq_best
+        if Rsq > best.val
             % This is the best fit found (for now)
-            Rsq_best = Rsq;
+            best.val = Rsq;
             % Save fit's parameters
-            Rsq_best_start = i;
-            Rsq_best_stop = i_max;
-            Rsq_best_m = m;
-            Rsq_best_q = q;
+            best.start = i;
+            best.stop = i_max;
+            best.m = m;
+            best.q = q;
+            best.h = h2fit;
+            best.dlin = d_lin;
         end
     end
     
     % Fit goodness too low
-    if Rsq_best < Rsq_min
+    if best.val < Rsq_min
         E = NaN;
         Erid = NaN;
+        
+        % fprintf('min_pt: %f => %f nm, h/R pt: %f\n', min_pt, min_pt * delta_z * 1e9, abs_min_hR * R / delta_z);
+        % figure;
+        % grid on;
+        % yyaxis left;
+        % plot(z, d);
+        % yyaxis right;
+        % plot(dx, dy);
         return
     end
+    
+    % Show the best fit
+    % fig = figure;
+    % grid on;
+    % hold on;
+    % scatter(best.h, best.dlin, 'Marker', '.', 'DisplayName', 'curve');
+    % plot(best.h, best.m*best.h + best.q, 'DisplayName', 'fit');
+    % legend('show', 'location', 'best');
+    % title('best fit found');
+    % xlabel('h [m]');
+    % ylabel('d^{2/3} [N^{2/3}]');
+    % close(fig);
 
     % Compute E
-    Erid = (Rsq_best_m ^ 1.5) * 0.75 * k / sqrt(R);
+    Erid = (best.m ^ 1.5) * 0.75 * k / sqrt(R);
     E = Erid * (1 - v^2);
 end
