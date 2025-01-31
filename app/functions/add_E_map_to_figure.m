@@ -27,6 +27,11 @@ function [img, imageRGB] = add_E_map_to_figure(Emap, options)
         options.inf_color   (1, 3)          {mustBeNumeric,mustBeReal}  = [0.75 0 0];
         options.clim        (1, 2)          {mustBeNumeric,mustBeReal}  = [0 0];
         options.scale       (1, :)  char    {mustBeMember(options.scale, {'linear', 'log'})} = 'linear';  
+        options.axes        (1, 1)                                      = 0;
+    end
+
+    if options.axes == 0
+        options.axes = gca;
     end
 
     options.mask_cmap = [options.nan_color; options.num_color; options.inf_color];
@@ -79,23 +84,23 @@ function [img, imageRGB] = add_E_map_to_figure(Emap, options)
     imageRGB = (1 - alpha) .* bkgRGB + alpha .* maskRGB;
     
     % Display the final image
-    img = image(gca, x, y, imageRGB);
+    img = image(options.axes, x, y, imageRGB);
      % Set the right aspect ratio
-    axis image;
+    axis(options.axes, 'image');
     % Set the vertical axis direction to high-to-low
-    set(gca, 'YDir', 'normal');
-    colormap(gca, options.image_cmap);
-    cb = colorbar(gca);
-    clim(options.clim);
+    set(options.axes, 'YDir', 'normal');
+    colormap(options.axes, options.image_cmap);
+    cb = colorbar(options.axes);
+    clim(options.axes, options.clim);
     if isequal(options.scale, 'log')
-        set(gca, 'ColorScale', 'log');
+        set(options.axes, 'ColorScale', 'log');
     end
-    xlabel(gca, 'x [{\mu}m]');
-    ylabel(gca, 'y [{\mu}m]');
+    xlabel(options.axes, 'x [{\mu}m]');
+    ylabel(options.axes, 'y [{\mu}m]');
     ylabel(cb, sprintf('E [%s]', options.um));
-    title(options.title);
-    xticks(gca, linspace(0, options.L, 5));
-    yticks(gca, linspace(0, options.L, 5));
+    title(options.axes, options.title);
+    xticks(options.axes, linspace(0, options.L, 5));
+    yticks(options.axes, linspace(0, options.L, 5));
     
     % Add NaN and Inf to the legend
 
@@ -119,19 +124,19 @@ function [img, imageRGB] = add_E_map_to_figure(Emap, options)
     % figure;
     % imagesc(x, y, Emap);
     %  % Set the right aspect ratio
-    % axis image;
+    % axis(options.axes, 'image');
     % % Set the vertical axis direction to high-to-low
-    % set(gca, 'YDir', 'normal');
-    % colormap(gca, options.image_cmap);
-    % cb = colorbar(gca);
-    % clim(options.clim);
+    % set(options.axes, 'YDir', 'normal');
+    % colormap(options.axes, options.image_cmap);
+    % cb = colorbar(options.axes);
+    % clim(options.axes, options.clim);
     % if isequal(options.scale, 'log')
-    %     set(gca, 'ColorScale', 'log');
+    %     set(options.axes, 'ColorScale', 'log');
     % end
-    % xlabel(gca, 'x [{\mu}m]');
-    % ylabel(gca, 'y [{\mu}m]');
+    % xlabel(options.axes, 'x [{\mu}m]');
+    % ylabel(options.axes, 'y [{\mu}m]');
     % ylabel(cb, sprintf('E [%s]', options.um));
-    % title(options.title);
-    % xticks(gca, linspace(0, options.L, 5));
-    % yticks(gca, linspace(0, options.L, 5));
+    % title(options.axes, options.title);
+    % xticks(options.axes, linspace(0, options.L, 5));
+    % yticks(options.axes, linspace(0, options.L, 5));
 end
