@@ -28,6 +28,7 @@ function [img, imageRGB] = add_E_map_to_figure(Emap, options)
         options.clim        (1, 2)          {mustBeNumeric,mustBeReal}  = [0 0];
         options.scale       (1, :)  char    {mustBeMember(options.scale, {'linear', 'log'})} = 'linear';  
         options.axes        (1, 1)                                      = 0;
+        options.fullLegend  (1, 1)  logical                                = true;
     end
 
     if options.axes == 0
@@ -94,6 +95,8 @@ function [img, imageRGB] = add_E_map_to_figure(Emap, options)
     clim(options.axes, options.clim);
     if isequal(options.scale, 'log')
         set(options.axes, 'ColorScale', 'log');
+    else
+        set(options.axes, 'ColorScale', 'linear');
     end
     xlabel(options.axes, 'x [{\mu}m]');
     ylabel(options.axes, 'y [{\mu}m]');
@@ -103,23 +106,23 @@ function [img, imageRGB] = add_E_map_to_figure(Emap, options)
     yticks(options.axes, linspace(0, options.L, 5));
     
     % Add NaN and Inf to the legend
+    if options.fullLegend
+        pos = cb.Position;
+        x_start = pos(1);
+        y_start = pos(2);
+        w = pos(3);
+        h = pos(4);
+        h2 = h * 0.035;
 
-    pos = cb.Position; 
-    x_start = pos(1);
-    y_start = pos(2);
-    w = pos(3);
-    h = pos(4);
-    h2 = h * 0.035;
+        % NaN
+        annotation('rectangle', 'Position', [x_start, y_start - 3*h2/2, w, -h2] , 'FaceColor', options.nan_color);
+        tb = annotation('textbox', [x_start + w, y_start - 5*h2/2, 1, h2], 'String', 'Model failed', 'FontSize', cb.FontSize, 'FontName', cb.FontName, 'FitBoxToText', 'on', 'EdgeColor', 'none', 'VerticalAlignment', 'middle');
+        % drawnow;
 
-    % NaN
-    annotation('rectangle', 'Position', [x_start, y_start - 3*h2/2, w, -h2] , 'FaceColor', options.nan_color);
-    tb = annotation('textbox', [x_start + w, y_start - 5*h2/2, 1, h2], 'String', 'Model failed', 'FontSize', cb.FontSize, 'FontName', cb.FontName, 'FitBoxToText', 'on', 'EdgeColor', 'none', 'VerticalAlignment', 'middle');
-    % drawnow;
-
-    % Inf
-    annotation('rectangle', 'Position', [x_start, y_start + h + 3*h2/2, w, h2] , 'FaceColor', options.inf_color);
-    tb = annotation('textbox', [x_start + w, y_start + h + 3*h2/2, 1, h2], 'String', 'No indent', 'FontSize', cb.FontSize, 'FontName', cb.FontName, 'FitBoxToText', 'on', 'EdgeColor', 'none', 'VerticalAlignment', 'middle');
-
+        % Inf
+        annotation('rectangle', 'Position', [x_start, y_start + h + 3*h2/2, w, h2] , 'FaceColor', options.inf_color);
+        tb = annotation('textbox', [x_start + w, y_start + h + 3*h2/2, 1, h2], 'String', 'No indent', 'FontSize', cb.FontSize, 'FontName', cb.FontName, 'FitBoxToText', 'on', 'EdgeColor', 'none', 'VerticalAlignment', 'middle');
+    end
     % Debug
     % figure;
     % imagesc(x, y, Emap);
