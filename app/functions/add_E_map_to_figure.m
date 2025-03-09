@@ -28,7 +28,7 @@ function [img, imageRGB] = add_E_map_to_figure(Emap, options)
         options.clim        (1, 2)          {mustBeNumeric,mustBeReal}  = [0 0];
         options.scale       (1, :)  char    {mustBeMember(options.scale, {'linear', 'log'})} = 'linear';  
         options.axes        (1, 1)                                      = 0;
-        options.fullLegend  (1, 1)  logical                                = true;
+        options.fullLegend  (1, 1)  logical                             = true;
     end
 
     if options.axes == 0
