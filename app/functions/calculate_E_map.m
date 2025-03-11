@@ -13,7 +13,8 @@ function [Emap, Eridmap, z, good_curves] = calculate_E_map(filename, slope, k, R
     % By putting Rsq_min = 0 no point is excluded, even the ones with 
     % terrible (Rsq ~ 0) fit.
     % b_start [0:1] = Percentage of the curve from which to start fitting 
-    % the background. 
+    % the background. If it is 1 no fit is made and only the offset will be
+    % removed.
     % Returns:
     % Emap [Pa] = Matrix containing Young's modulus computed for every 
     % curve. If the fit failed or it's not acceptable (Rsq < Rsq_min) 
@@ -26,7 +27,7 @@ function [Emap, Eridmap, z, good_curves] = calculate_E_map(filename, slope, k, R
     % result. The curves are horizontal vectors.
 
     % Load map's curves
-    data = load(filename);
+    data = load_E_map(filename);
     s = size(data);
     rows = s(1);
     columns = s(2);
@@ -60,7 +61,11 @@ function [Emap, Eridmap, z, good_curves] = calculate_E_map(filename, slope, k, R
 
             d = (Nf_list(:, curva) / slope) * 1e-9;
             % Remove background
-            d = remove_background(z, d, b_start * max(z), +Inf);
+            if b_start == 1                
+                d = remove_background(z, d, +Inf, +Inf);
+            else 
+                d = remove_background(z, d, b_start * max(z), +Inf);
+            end
             [Emap(i,j), Eridmap(i,j)] = calculate_E_curve(z, d, k, R, v, n, Rsq_min);
 
             if ~isnan(Emap(i, j))

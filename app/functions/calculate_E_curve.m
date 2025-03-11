@@ -43,6 +43,15 @@ function [E, Erid, u_E, u_Erid] = calculate_E_curve(z, d, k, R, v, n, Rsq_min)
 
     % Smooth the curve and work only on that
     [z, d] = moving_average_filter(z, d, n);
+    
+    % If there are less than 800 points, interpolate them
+    if length(d) < 800
+        z_new = linspace(min(z), max(z), 800);
+        d_new = interp1(z, d, z_new, 'spline');
+
+        z = z_new;
+        d = d_new;
+    end
 
     % Compute first derivative
     [dx, dy] = local_derivative(z, d, n);

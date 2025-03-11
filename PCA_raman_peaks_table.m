@@ -16,6 +16,7 @@ files = dir(fullfile(d, '*.txt'));
 peaks = zeros(1, length(files));
 peaks_table = zeros(1, length(files));
 
+fprintf('Trovati %d picchi\n', length(files));
 for i = 1:length(files)
     fprintf('Processando file %d/%d\n', i, length(files));
     f = files(i);
@@ -62,11 +63,6 @@ for i = 1:length(files)
     data = load(temp2file);
     
     if i == 1
-        delete(temp1file);
-    end
-    delete(temp2file);
-    
-    if i == 1
         x = data(:, 1);
         y = data(:, 2);
     end
@@ -77,7 +73,7 @@ for i = 1:length(files)
     % Ricordati di trasporre altrimenti sbaglia
     [picchi, picchi_i] = max(intensities');
     % Come picco scegli quello corrispondente al picco più alto che è
-    % presente nella mapp
+    % presente nella mappa
     [~, p] = max(picchi);
     picco_i = picchi_i(p);
     % A questo punto prendi shift e amp per ciascuno spettro
@@ -94,11 +90,23 @@ for i = 1:length(files)
     peaks_table(:, i) = amp;
 end
 
+% Printa i picchi riconosciuti
+fprintf('Picchi presenti nella mappa (non sono in ordine, colpa di LabSpec):\n');
+for i = 1:length(peaks)
+    fprintf('\t%5.2f cm^-1\n', peaks(i));
+end
+
 % Mostra i primi 3 spettri
 figure;
 grid on;
 hold on;
-bar(peaks, peaks_table(1:3, :));
+stem(peaks, peaks_table(1, :), 'filled', 'DisplayName', 'Spettro 1', 'LineWidth', 2);
+stem(peaks, peaks_table(2, :), 'filled', 'DisplayName', 'Spettro 2', 'LineWidth', 2);
+stem(peaks, peaks_table(3, :), 'filled', 'DisplayName', 'Spettro 3', 'LineWidth', 2);
+legend('show', 'Location', 'best');
+title('I primi 3 spettri della mappa');
+xlabel('shift Raman [cm^{-1}]');
+ylabel('intensità [au]');
 
 % Salva la peaks table
 % Scegli il percorso
@@ -106,8 +114,8 @@ bar(peaks, peaks_table(1:3, :));
 
 % Apri il file e replica la struttura del file txt di LabSpec
 % Senza le due tabulazioni prima degli shifts
-% Vettore degli shift
-writematrix(shift, fullfile(dirName, fileName));
+% Vettore degli shift dei picchi
+writematrix(peaks, fullfile(dirName, fileName));
 % Matrice
 data = [x, y, peaks_table];
 writematrix(data, fullfile(dirName, fileName), 'WriteMode','append');
@@ -146,15 +154,24 @@ fclose(fid_temp1);
 fclose(fid_temp2);
 clear line;
 
-shift = load(temp1file);
+peaks = load(temp1file);
 data = load(temp2file);
-
-delete(temp1file);
-delete(temp2file);
 
 x = data(:, 1);
 y = data(:, 2);
 peaks_table = data(:, 3:end);
+
+% Mostra i primi 3 spettri
+figure;
+grid on;
+hold on;
+stem(peaks, peaks_table(1, :), 'filled', 'DisplayName', 'Spettro 1', 'LineWidth', 2);
+stem(peaks, peaks_table(2, :), 'filled', 'DisplayName', 'Spettro 2', 'LineWidth', 2);
+stem(peaks, peaks_table(3, :), 'filled', 'DisplayName', 'Spettro 3', 'LineWidth', 2);
+legend('show', 'Location', 'best');
+title('I primi 3 spettri della mappa');
+xlabel('shift Raman [cm^{-1}]');
+ylabel('intensità [au]');
 
 % Per la PCA servono
 % X = matrice dei dati PxN
@@ -224,12 +241,13 @@ for q = 1:5
     tiledlayout(1, 2);
 
     nexttile;
-    hold on;
+    % Mostra i loadings (coefficients) per questa PC
     grid on;
+    hold on;
+    stem(peaks', coeff_PC, 'filled', 'LineWidth', 2);
     title(['Peso di ciascuno shift raman sulla PC ' num2str(q)]);
-    xlabel('shift [cm^{-1}]');
+    xlabel('shift Raman [cm^{-1}]');
     ylabel('coeff');
-    bar(peaks', coeff_PC);
 
     % Mostra per ciascun punto misurato il proprio score lungo la PC
     score_PC = score(:, q);
