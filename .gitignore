@@ -1,4 +1,4 @@
-dati/
-output/
+/dati/
+/output/
 /*.png
 /*.mat
