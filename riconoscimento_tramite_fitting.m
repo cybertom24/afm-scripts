@@ -186,18 +186,20 @@ h2fit_s = h_fit_s(h_fit_s > 0);
 
 d_lin_s = potenza(d2fit_s, 2/3);
 
+%%
+
 figure;
 grid on;
 hold on;
 legend show;
-scatter(h2fit_s, d_lin_s, 'Marker', '.', 'SizeData', marker_size, 'DisplayName', 'Curva D^{2/3}Z [\sigma]');
-plot(h2fit_s, sigma_best_m * h2fit_s + sigma_best_q, 'DisplayName', 'fit lineare [\sigma]');
-title('Miglior fit trovato - curva linearizzata');
-xlabel('h [m]');
-ylabel('d^{2/3} [m^{2/3}]');
+% scatter(h2fit_s, d_lin_s, 'Marker', '.', 'SizeData', marker_size, 'DisplayName', 'Curva D^{2/3}Z [\sigma]');
+% plot(h2fit_s, sigma_best_m * h2fit_s + sigma_best_q, 'DisplayName', 'fit lineare [\sigma]');
+% title('Miglior fit trovato - curva linearizzata');
+xlabel('h [nm]');
+ylabel('F^{2/3} [N^{2/3}]');
 
-z_fit_r = z(Rsq_best_start:Rsq_best_stop) * 1e-9;
-d_fit_r = d(Rsq_best_start:Rsq_best_stop) * 1e-9;
+z_fit_r = z(Rsq_best_start:Rsq_best_stop)* 1e-9;
+d_fit_r = d(Rsq_best_start:Rsq_best_stop)* 1e-9;
 
 [d_min, i_d_min] = min(d_fit_r);
 z_fit_r = z_fit_r - z_fit_r(i_d_min);
@@ -210,8 +212,9 @@ h2fit_r = h_fit_r(h_fit_r > 0);
 
 d_lin_r = potenza(d2fit_r, 2/3);
 
-scatter(h2fit_r, d_lin_r, 'Marker', '.', 'SizeData', marker_size, 'DisplayName', 'Curva D^{2/3}Z [R^2]');
-plot(h2fit_r, Rsq_best_m * h2fit_r + Rsq_best_q, 'DisplayName', 'fit lineare [R^2]');
+plot(h2fit_r * 1e9, (Rsq_best_m * h2fit_r + Rsq_best_q), 'DisplayName', 'Linear fit', 'LineWidth', 2);
+scatter(h2fit_r * 1e9, d_lin_r, 'Marker', '.', 'SizeData', marker_size, 'DisplayName', 'Linearized curve');
+
 
 % Calcola E
 Erid = (Rsq_best_m ^ 1.5) * 0.75 * k / sqrt(R);
