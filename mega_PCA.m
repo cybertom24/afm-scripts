@@ -100,7 +100,7 @@ for i = 1:length(files_acm)
 end
 fprintf('Fine mappe ACM\n');
 
-%% --- Accorpa le mappe ed esegui la PCA ---
+%% --- Accorpa le mappe ---
 
 points_per_map = size(maps_acm{1}, 1);
 
@@ -118,7 +118,16 @@ end
 
 fprintf('Mega map pronta\n');
 
-[coeff, score, latent, ~, explained] = pca(mega_map);
+%% --- Normalizza i dati ---
+% Easy normalizzazione min-max ovvero il minimo viene portato a 0 e il
+% massimo a 1
+mega_map_norm = normalize(mega_map, 2, "norm");
+
+%% --- Esegui la PCA ---
+
+% Fai in modo che la PCA non rimuova la media durante il calcolo
+% Esegui la PCA sui dati normalizzati
+[coeff, score, latent, ~, explained] = pca(mega_map_norm, 'Centered', 'off');
 
 fprintf('PCA completata\n');
 
@@ -195,9 +204,6 @@ end
 %% --- Mostra nello spazio 3D delle prime 3 PC ---
 
 figure;
-tiledlayout(1, 2);
-
-nexttile;
 grid on;
 hold on;
 legend('show', 'Location', 'best');
@@ -213,7 +219,7 @@ title('Loadings');
 xlabel('Raman shift [cm^{-1}]');
 ylabel('loading');
 
-nexttile;
+figure;
 grid on;
 hold on;
 for m = 1:(length(maps_iso) + length(maps_acm))
@@ -232,10 +238,10 @@ for m = 1:(length(maps_iso) + length(maps_acm))
     end
 
     title('Points in 3D space');
-    xlabel('PC1');
-    ylabel('PC2');
-    zlabel('PC3');
-    subtitle('blue: ISO | red: ACM');
+    xlabel('PC1 [a.u.]');
+    ylabel('PC2 [a.u.]');
+    zlabel('PC3 [a.u.]');
+    subtitle('blue: H-CO | red: D-CO');
 
     % legend('show', 'Location', 'best');
 end
@@ -263,9 +269,9 @@ for m = 1:(length(maps_iso) + length(maps_acm))
     end
 
     title('PC2 vs PC1');
-    xlabel('PC1');
-    ylabel('PC2');
-    subtitle('blue: ISO | red: ACM');
+    xlabel('PC1 [a.u.]');
+    ylabel('PC2 [a.u.]');
+    subtitle('blue: H-CO | red: D-CO');
 
     %legend('show', 'Location', 'best');
 end
@@ -288,9 +294,9 @@ for m = 1:(length(maps_iso) + length(maps_acm))
     end
 
     title('PC3 vs PC2');
-    xlabel('PC2');
-    ylabel('PC3');
-    subtitle('blue: ISO | red: ACM');
+    xlabel('PC2 [a.u.]');
+    ylabel('PC3 [a.u.]');
+    subtitle('blue: H-CO | red: D-CO');
 
     %legend('show', 'Location', 'best');
 end
@@ -313,9 +319,9 @@ for m = 1:(length(maps_iso) + length(maps_acm))
     end
 
     title('PC3 vs PC1');
-    xlabel('PC1');
-    ylabel('PC3');
-    subtitle('blue: ISO | red: ACM');
+    xlabel('PC1 [a.u.]');
+    ylabel('PC3 [a.u.]');
+    subtitle('blue: H-CO | red: D-CO');
 
     %legend('show', 'Location', 'best');
 end

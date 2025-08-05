@@ -114,3 +114,15 @@ swarmchart(acm(:) * 0 + 2, acm(:), 'SizeData', 50, 'DisplayName', 'D-CO', 'Marke
 title('EXP113');
 % xlabel('');
 ylabel('E [Pa]');
+
+%% --- Genera il box plot logaritmico ---
+
+[padded_iso, padded_acm] = pad_with_NaN(iso, acm);
+
+figure;
+grid on;
+hold on;
+set(gca, 'YScale', 'log');
+boxplot([padded_iso, padded_acm], 'Notch', 'off', 'Labels', {'H-CO', 'D-CO'});
+% title('PCx score between two classes');
+ylabel('E [Pa]');
