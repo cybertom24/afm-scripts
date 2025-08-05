@@ -172,7 +172,7 @@ clear b i n shifts X y_shifts Y to_include
 %% Applica i vari tipi di normalizzazioni
 
 normalization_types = {'range', 'norm', 'area'};
-mean_removal = {'meanpres'};% , 'meanremv'};
+mean_removal = {'meanpres'}; %, 'meanremv'};
 
 dataset_normalized = struct([]);
 for i = 1:length(dataset)
@@ -196,7 +196,7 @@ for i = 1:length(dataset)
                     X(start:stop, :) = Y;
                 end
             end
-
+            
             if isequal(type, 'area')
                 % Normalizza per l'area
 
@@ -550,7 +550,7 @@ text(0, 1, ...
 
 %% Testa il modello tenendo fuori una coppia di mappe alla volta
 
-i = 12;
+i = 9;
 
 points_per_map = pca_results(i).points_per_map;
 n_maps = pca_results(i).tot_iso / points_per_map;
@@ -583,7 +583,12 @@ for i_map = 1:n_maps
 
     % Estrai gli spettri da includere
     X_included = X(are_included, :);
-    
+
+    % Calcola la media
+    % avg = mean(X_included, 1);
+    % Rimuovila
+    % X_included = X_included - avg;
+
     % Applica la PCA
     [coeff, score, latent, ~, explained] = pca(X_included, 'Centered', 'off');
 
@@ -628,6 +633,10 @@ for i_map = 1:n_maps
     % Applica il modello sugli spettri esclusi
     pcx_scores_excluded_iso = pcx_coeff * X_excluded_iso' + K;
     pcx_scores_excluded_acm = pcx_coeff * X_excluded_acm' + K;
+    
+    % Rimuovi la media calcolata prima
+    % pcx_scores_excluded_iso = pcx_coeff * (X_excluded_iso - avg)' + K;
+    % pcx_scores_excluded_acm = pcx_coeff * (X_excluded_acm - avg)' + K;
 
     % Conta quanti errori ci sono
     if are_acm_positive
