@@ -145,10 +145,34 @@ fprintf('Dataset pronto\n');
 
 dataset = [bundle_raw, bundle_fit];
 
+%% Accorcia i dataset
+bands = [600, 1800; 2700, 3150];
+
+n = length(dataset);
+for i = 1:n
+    X = dataset(i).X;
+    shifts = dataset(i).shifts;
+    
+    to_include = 0 * shifts;
+    for b = 1:size(bands, 1)
+        to_include = to_include | (shifts >= bands(b, 1) & shifts <= bands(b, 2));
+    end
+    
+    Y = X(:, to_include);
+    y_shifts = shifts(to_include);
+
+    dataset(n + i) = dataset(i);
+    dataset(n + i).X = Y;
+    dataset(n + i).shifts = y_shifts;
+    dataset(n + i).name = sprintf('%s-%s', dataset(i).name, 'bands');
+end
+
+clear b i n shifts X y_shifts Y to_include
+
 %% Applica i vari tipi di normalizzazioni
 
 normalization_types = {'range', 'norm', 'area'};
-mean_removal = {'meanpres', 'meanremv'};
+mean_removal = {'meanpres'};% , 'meanremv'};
 
 dataset_normalized = struct([]);
 for i = 1:length(dataset)
@@ -211,7 +235,6 @@ pca_results = struct([]);
 for i = 1:n
     X = dataset_normalized(i).X;
     name = dataset_normalized(i).name;
-    points_per_map = dataset_normalized(i).points_per_map;
 
     fprintf('[%d/%d] Nome: %s\n', i, n, name);
     fprintf('[%d/%d] Applicando PCA\n', i, n);
@@ -290,7 +313,7 @@ for i = 1:n
     pca_results(i).err_rate = err_rate;
 end
 
-clear acm_label are_acm_positive classes classifier coeff err_acm err_iso err_rate explained f i i_map j K L L_string max_PC n name pcx_coeff pcx_scores_acm pcx_scores_iso points_per_map tot_acm tot_iso X Y Y_acm Y_iso score latent
+clear acm_label are_acm_positive classes classifier coeff err_acm err_iso err_rate explained f i i_map j K L L_string max_PC n name pcx_coeff pcx_scores_acm pcx_scores_iso tot_acm tot_iso X Y Y_acm Y_iso score latent
 
 %% Plotta i risultati della PCA-LDA
 
@@ -369,6 +392,8 @@ for i = 1:length(pca_results)
         sprintf('Name: %s\nPC used for LDA: %d\nL = [%s]\nK = %.2f\nD-COs are: %s\nsuccess rate: %.2f%%\n', pca_results(i).name, pca_results(i).max_PC, L_string, pca_results(i).K, pca_results(i).acm_label, (1 - pca_results(i).err_rate) * 100), ...
         'HorizontalAlignment', 'left', 'VerticalAlignment', 'top', 'FontSize', 12);
 end
+
+clear i i_map L_string Y Y_acm Y_iso
 
 %% Plotta i PCx loadings calcolati tutti assieme
 
