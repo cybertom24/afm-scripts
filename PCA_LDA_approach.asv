@@ -148,38 +148,55 @@ dataset = [bundle_raw, bundle_fit];
 %% Applica i vari tipi di normalizzazioni
 
 normalization_types = {'range', 'norm', 'area'};
+mean_removal = {'meanpres', 'meanremv'};
 
 dataset_normalized = struct([]);
 for i = 1:length(dataset)
     for j = 1:length(normalization_types)
-        type = normalization_types{j};
-        
-        k = (i-1) * length(normalization_types) + j;
-        X = dataset(i).X;
-        shifts = dataset(i).shifts;
-        if isequal(type, 'area')
-            % Normalizza per l'area
-            
-            % Dividi ciascuno spettro per la rispettiva area
-            for spect = 1:size(X, 1)
-                x = X(spect, :);
-                X(spect, :) = x / trapz(shifts, x);
-            end
-        else
-            X = normalize(X, 2, type);
-        end
+        for k = 1:length(mean_removal)
+            type = normalization_types{j};
+            remove_mean = mean_removal{k};
 
-        % Copia tutti i campi
-        for f = fieldnames(dataset(i))'
-            dataset_normalized(k).(f{1}) = dataset(i).(f{1});
+            index = (i-1) * (length(normalization_types) * length(mean_removal)) + (j - 1) * length(mean_removal) + k;
+            X = dataset(i).X;
+            shifts = dataset(i).shifts;
+            points_per_map = dataset(i).points_per_map;
+            
+            if isequal(remove_mean, 'meanremv')
+                for map = 1:(size(X, 1) / points_per_map)
+                    start = (map - 1) * points_per_map + 1;
+                    stop = map * points_per_map;
+                    avg = mean(X(start:stop, :), 1);
+
+                    Y = X(start:stop, :) - avg;
+                    X(start:stop, :) = Y;
+                end
+            end
+
+            if isequal(type, 'area')
+                % Normalizza per l'area
+
+                % Dividi ciascuno spettro per la rispettiva area
+                for spect = 1:size(X, 1)
+                    x = X(spect, :);
+                    X(spect, :) = x / trapz(shifts, abs(x));
+                end
+            else
+                X = normalize(X, 2, type);
+            end
+
+            % Copia tutti i campi
+            for f = fieldnames(dataset(i))'
+                dataset_normalized(index).(f{1}) = dataset(i).(f{1});
+            end
+            % Aggiorna quelli presenti
+            dataset_normalized(index).X = X;
+            dataset_normalized(index).name = sprintf('%s-%s-%s', dataset(i).name, type, remove_mean);
         end
-        % Aggiorna quelli presenti
-        dataset_normalized(k).X = X;
-        dataset_normalized(k).name = sprintf('%s-%s', dataset(i).name, type);
     end
 end
 
-clear d_X d_name type i j k l
+clear d_X d_name type i j k l index remove_mean x X Y shifts spect start stop map f avg points_per_map
 
 whos dataset_normalized
 
@@ -197,32 +214,9 @@ for i = 1:n
     points_per_map = dataset_normalized(i).points_per_map;
 
     fprintf('[%d/%d] Nome: %s\n', i, n, name);
-    
-    figure;
-    tiledlayout("flow");
-    sgtitle(name);
-
     fprintf('[%d/%d] Applicando PCA\n', i, n);
 
     [coeff, score, latent, ~, explained] = pca(X, 'Centered', 'off');
-
-    nexttile;
-    hold on;
-    grid on;
-    plot(dataset_normalized(i).shifts, coeff(:, 1:3));
-    legend('PC1', 'PC2', 'PC3', 'Location', 'best');
-    title('PC1, PC2 and PC3 loadings');
-    xlabel('shift [cm^{-1}]');
-    ylabel('coeff [a.u.]');
-
-    nexttile;
-    grid on;
-    hold on;
-    title('Explained variance of PCs');
-    bar(explained);
-    xlabel('PC index');
-    ylabel('Explained variance [%]');
-    set(gca, 'YScale', 'log');
 
     tot_iso = dataset_normalized(i).tot_iso;
     tot_acm = dataset_normalized(i).tot_acm;
@@ -233,15 +227,6 @@ for i = 1:n
     
     Y_iso = Y(1:tot_iso, :);
     Y_acm = Y((tot_iso+1):end, :);
-
-    nexttile;
-    grid on;
-    hold on;
-    title('PC scores');
-    violinplot(Y_iso, 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75]);
-    violinplot(Y_acm, 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00]);
-    xlabel('PC index');
-    ylabel('PC score [a.u.]');
 
     fprintf('[%d/%d] Applicando LDA\n', i, n);
 
@@ -265,37 +250,8 @@ for i = 1:n
     % Genera la PCx
     pcx_coeff = L' * coeff(:, 1:max_PC)';
 
-    nexttile;
-    grid on;
-    hold on;
-    plot(dataset_normalized(i).shifts, pcx_coeff);
-    title('PCx loadings');
-    xlabel('shift [cm^{-1}]');
-    ylabel('coeff [a.u.]');
-
     pcx_scores_iso = L' * Y_iso' + K;
     pcx_scores_acm = L' * Y_acm' + K;
-
-    nexttile;
-    grid on;
-    hold on;
-    title('PCx scores - global');
-    violinplot(pcx_scores_iso, 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75], 'DisplayName', 'H-CO');
-    violinplot(pcx_scores_acm, 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00], 'DisplayName', 'D-CO');
-    xlabel('PCx');
-    ylabel('PC score [a.u.]');
-    legend show;
-
-    nexttile;
-    grid on;
-    hold on;
-    title('PCx scores - by map');
-    for i_map = 1:(tot_iso / points_per_map)
-        violinplot(i_map * ones(1, points_per_map), pcx_scores_iso(((i_map-1) * points_per_map + 1):(i_map * points_per_map)), 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75]);
-        violinplot(i_map * ones(1, points_per_map), pcx_scores_acm(((i_map-1) * points_per_map + 1):(i_map * points_per_map)), 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00]);
-    end
-    xlabel('Map index');
-    ylabel('PC score [a.u.]');
 
     % Vediamo quanto funziona il modello
     are_acm_positive = mean(pcx_scores_acm) > 0;
@@ -310,21 +266,11 @@ for i = 1:n
 
     err_rate = (err_acm + err_iso) / (tot_iso + tot_acm);
 
-    % Aggiungi del testo riassuntivo
-    nexttile;
-    axis off;
-    
     if are_acm_positive
         acm_label = '+';
     else
         acm_label = '-';
     end
-    
-    L_string = sprintf('%.2f ', L);
-
-    text(0, 1, ...
-        sprintf('Name: %s\nPC used for LDA: %d\nL = [%s]\nK = %.2f\nD-COs are: %s\nsuccess rate: %.2f%%\n', name, max_PC, L_string, K, acm_label, (1 - err_rate) * 100), ...
-        'HorizontalAlignment', 'left', 'VerticalAlignment', 'top', 'FontSize', 12);
     
     % Copia tutti i campi
     for f = fieldnames(dataset_normalized(i))'
@@ -342,6 +288,86 @@ for i = 1:n
     pca_results(i).pcx_scores = [pcx_scores_iso'; pcx_scores_acm'];
     pca_results(i).acm_label = acm_label;
     pca_results(i).err_rate = err_rate;
+end
+
+clear acm_label are_acm_positive classes classifier coeff err_acm err_iso err_rate explained f i i_map j K L L_string max_PC n name pcx_coeff pcx_scores_acm pcx_scores_iso points_per_map tot_acm tot_iso X Y Y_acm Y_iso score latent
+
+%% Plotta i risultati della PCA-LDA
+
+for i = 1:length(pca_results)
+    figure;
+    tiledlayout("flow");
+    sgtitle(pca_results(i).name);
+
+    nexttile;
+    hold on;
+    grid on;
+    plot(pca_results(i).shifts, pca_results(i).coeff(:, 1:3));
+    legend('PC1', 'PC2', 'PC3', 'Location', 'best');
+    title('PC1, PC2 and PC3 loadings');
+    xlabel('shift [cm^{-1}]');
+    ylabel('coeff [a.u.]');
+
+    nexttile;
+    grid on;
+    hold on;
+    title('Explained variance of PCs');
+    bar(pca_results(i).explained);
+    xlabel('PC index');
+    ylabel('Explained variance [%]');
+    set(gca, 'YScale', 'log');
+    
+    Y = pca_results(i).score(:, 1:pca_results(i).max_PC);
+    Y_iso = Y(1:pca_results(i).tot_iso, :);
+    Y_acm = Y((pca_results(i).tot_iso + 1):end, :);
+
+    nexttile;
+    grid on;
+    hold on;
+    title('PC scores');
+    violinplot(Y_iso, 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75]);
+    violinplot(Y_acm, 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00]);
+    xlabel('PC index');
+    ylabel('PC score [a.u.]');
+    
+    nexttile;
+    grid on;
+    hold on;
+    plot(pca_results(i).shifts, pca_results(i).pcx_coeff);
+    title('PCx loadings');
+    xlabel('shift [cm^{-1}]');
+    ylabel('coeff [a.u.]');
+    
+    nexttile;
+    grid on;
+    hold on;
+    title('PCx scores - global');
+    violinplot(pca_results(i).pcx_scores(1:pca_results(i).tot_iso), 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75], 'DisplayName', 'H-CO');
+    violinplot(pca_results(i).pcx_scores((pca_results(i).tot_iso + 1):end), 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00], 'DisplayName', 'D-CO');
+    xlabel('PCx');
+    ylabel('PC score [a.u.]');
+    legend show;
+
+    nexttile;
+    grid on;
+    hold on;
+    title('PCx scores - by map');
+    for i_map = 1:(length(pca_results(i).pcx_scores) / pca_results(i).points_per_map)
+        if ((i_map-1) * pca_results(i).points_per_map < pca_results(i).tot_iso)
+            violinplot(i_map * ones(1, pca_results(i).points_per_map), pca_results(i).pcx_scores(((i_map-1) * pca_results(i).points_per_map + 1):(i_map * pca_results(i).points_per_map)), 'FaceColor', [0.07 0.44 0.75]);
+        else
+            violinplot(i_map * ones(1, pca_results(i).points_per_map), pca_results(i).pcx_scores(((i_map-1) * pca_results(i).points_per_map + 1):(i_map * pca_results(i).points_per_map)), 'FaceColor', [0.87 0.33 0.00]);
+        end
+    end
+    xlabel('Map index');
+    ylabel('PC score [a.u.]');
+
+    nexttile;
+    axis off;
+    L_string = sprintf('%.2f ', pca_results(i).L);
+    text(0, 1, ...
+        sprintf('Name: %s\nPC used for LDA: %d\nL = [%s]\nK = %.2f\nD-COs are: %s\nsuccess rate: %.2f%%\n', pca_results(i).name, pca_results(i).max_PC, L_string, pca_results(i).K, pca_results(i).acm_label, (1 - pca_results(i).err_rate) * 100), ...
+        'HorizontalAlignment', 'left', 'VerticalAlignment', 'top', 'FontSize', 12);
 end
 
 %% Plotta i PCx loadings calcolati tutti assieme
@@ -499,7 +525,7 @@ text(0, 1, ...
 
 %% Testa il modello tenendo fuori una coppia di mappe alla volta
 
-i = 2;
+i = 12;
 
 points_per_map = pca_results(i).points_per_map;
 n_maps = pca_results(i).tot_iso / points_per_map;
@@ -590,9 +616,9 @@ for i_map = 1:n_maps
     err_rate = (err_acm + err_iso) / (length(pcx_scores_excluded_iso) + length(pcx_scores_excluded_acm));
 
     % Salva i risultati
-    err_rate_list(i_map, 1) = err_iso / length(pcx_scores_excluded_iso);
-    err_rate_list(i_map, 2) = err_acm / length(pcx_scores_excluded_acm);
-    err_rate_list(i_map, 3) = err_rate;
+    err_rate_list(i_map, 1) = err_rate;
+    err_rate_list(i_map, 2) = err_iso / (length(pcx_scores_excluded_iso) + length(pcx_scores_excluded_acm));
+    err_rate_list(i_map, 3) = err_acm / (length(pcx_scores_excluded_iso) + length(pcx_scores_excluded_acm));
 
     pcx_coeff_list(i_map, :) = pcx_coeff;
     
@@ -603,9 +629,9 @@ for i_map = 1:n_maps
     pcx_scores_excluded_acm_list(i_map, :) = pcx_scores_excluded_acm;
 end
 
-mean_err_acm = mean(err_rate_list(:, 2));
-mean_err_iso = mean(err_rate_list(:, 1));
-mean_err = mean(err_rate_list(:, 3));
+mean_err = mean(err_rate_list(:, 1));
+mean_err_iso = mean(err_rate_list(:, 2));
+mean_err_acm = mean(err_rate_list(:, 3));
 
 figure;
 tiledlayout('flow')
@@ -653,41 +679,32 @@ ylabel('coeff [a.u.]');
 legend('show', 'Location', 'best');
 
 for i_map = 1:n_maps
-    % plot(pca_results(i).shifts, normalize(pcx_coeff_list(i_map, :), 'range', [-0.5 0.5]) + i_map, 'DisplayName', sprintf('Without map %d', i_map));
-    plot(pca_results(i).shifts, pcx_coeff_list(i_map, :) + i_map, 'DisplayName', sprintf('Without map %d', i_map));
+    plot(pca_results(i).shifts, normalize(pcx_coeff_list(i_map, :), 'range', [-0.5 0.5]) + i_map, 'DisplayName', sprintf('Without map %d', i_map));
+    % plot(pca_results(i).shifts, pcx_coeff_list(i_map, :) + i_map, 'DisplayName', sprintf('Without map %d', i_map));
 end
 
-nexttile;
-title('False negatives');
-grid on;
-hold on;
-xlabel('Map removed');
-ylabel('Percentage [%]');
-bar(1:n_maps, err_rate_list(:, 2)*100, 'FaceAlpha', 0.65, 'FaceColor', [0.87 0.33 0.00]);
-yline(mean_err_acm*100, 'LineWidth', 2);
+rates = err_rate_list;
+rates(:, 1) = 1 - rates(:, 1);
 
 nexttile;
-title('False positives');
+title('Success rate, false negatives and false positives');
 grid on;
 hold on;
 xlabel('Map removed');
 ylabel('Percentage [%]');
-bar(1:n_maps, err_rate_list(:, 1)*100, 'FaceAlpha', 0.65);
-yline(mean_err_iso*100, 'LineWidth', 2);
-
-nexttile;
-title('Success rate');
-grid on;
-hold on;
-xlabel('Map removed');
-ylabel('Percentage [%]');
-bar(1:n_maps, (1 - err_rate_list(:, 3))*100, 'FaceAlpha', 0.65, 'FaceColor', [0.23 0.67 0.20]);
-yline((1 - mean_err)*100, 'LineWidth', 2);
+b = bar(1:n_maps, rates * 100, 'stacked');
+b(1).FaceAlpha = 0.65;
+b(2).FaceAlpha = 0.65;
+b(3).FaceAlpha = 0.65;
+b(1).FaceColor = [0.23 0.67 0.20];
+b(2).FaceColor = [0.87 0.33 0.00];
+b(3).FaceColor = [0.07 0.44 0.75];
+legend('Success rate', 'False negatives', 'False positives', 'Location', 'best');
 
 nexttile;
 axis off;
 text(0, 1, ...
-        sprintf('Name: %s\nPC used for LDA: %d\nN° of repetitions: %d\nFalse negatives: %.2f%%\nFalse positives: %.2f%%\nSuccess rate: %.2f%%\n', pca_results(i).name, pca_results(i).max_PC, n_maps, mean_err_acm * 100, mean_err_iso * 100, (1 - mean_err) * 100), ...
+        sprintf('Name: %s\nPC used for LDA: %d\nN° of repetitions: %d\nAverage false negatives: %.2f%%\nAverage false positives: %.2f%%\nAverage success rate: %.2f%%\n', pca_results(i).name, pca_results(i).max_PC, n_maps, mean_err_acm * 100, mean_err_iso * 100, (1 - mean_err) * 100), ...
         'HorizontalAlignment', 'left', 'VerticalAlignment', 'top', 'FontSize', 12);
 
 %% Proviamo il savo-approccio
