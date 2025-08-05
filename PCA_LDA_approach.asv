@@ -1,0 +1,887 @@
+%% ~ PCA-LDA ~
+% Questo script serve per testare tutti i possibili approcci che si possono
+% applicare per il metodo PCA-LDA
+
+% Note:
+% I file raw (quelli di fede) li ho limitati a 3150 cm-1 in modo da
+% escludere la banda dell'acqua
+
+%% Scelta del dataset
+% ! IMPORTANTE !
+% Cambia il nome della variabile da X a qualcos'altro in modo che non si
+% sovrascrivano
+
+% Carica i dataset
+[files_iso, dir_iso] = uigetfile('*.txt', 'Scegli il/i file contenente la mappa Raman ISO', 'MultiSelect', 'on');
+[files_acm, dir_acm] = uigetfile('*.txt', 'Scegli il/i file contenente la mappa Raman ACM', 'MultiSelect', 'on');
+
+maps_iso = cell(length(files_iso), 1);
+fprintf('Mappe ISO:\n');
+for i = 1:length(files_iso)
+    fname = files_iso{i};
+    fprintf('\t%s\n', fname);
+
+    % Apri la mappa
+    fullfname = fullfile(dir_iso, fname);
+
+    temp1file = 'temp1file.tsv';
+    temp2file = 'temp2file.tsv';
+
+    fid_temp1 = fopen(temp1file, 'w');
+    fid_temp2 = fopen(temp2file, 'w');
+
+    fid = fopen(fullfname, 'r');
+
+    if feof(fid)
+        return
+    end
+
+    line = fgetl(fid);
+    fprintf(fid_temp1, '%s\n', line);
+
+    while ~feof(fid)
+        line = fgetl(fid);
+        if ischar(line)
+            fprintf(fid_temp2, '%s\n', line);
+        end
+    end
+
+    fclose(fid);
+    fclose(fid_temp1);
+    fclose(fid_temp2);
+    clear line;
+
+    shifts = load(temp1file);
+    data = load(temp2file);
+
+    y = data(:, 1);
+    x = data(:, 2);
+    raman_map = data(:, 3:end);
+
+    maps_iso{i} = raman_map;
+end
+fprintf('Fine mappe ISO\n');
+
+% Stessa cosa con le ACM
+maps_acm = cell(length(files_acm), 1);
+fprintf('Mappe ACM:\n');
+for i = 1:length(files_acm)
+    fname = files_acm{i};
+    fprintf('\t%s\n', fname);
+
+    % Apri la mappa
+    fullfname = fullfile(dir_acm, fname);
+
+    temp1file = 'temp1file.tsv';
+    temp2file = 'temp2file.tsv';
+
+    fid_temp1 = fopen(temp1file, 'w');
+    fid_temp2 = fopen(temp2file, 'w');
+
+    fid = fopen(fullfname, 'r');
+
+    if feof(fid)
+        return
+    end
+
+    line = fgetl(fid);
+    fprintf(fid_temp1, '%s\n', line);
+
+    while ~feof(fid)
+        line = fgetl(fid);
+        if ischar(line)
+            fprintf(fid_temp2, '%s\n', line);
+        end
+    end
+
+    fclose(fid);
+    fclose(fid_temp1);
+    fclose(fid_temp2);
+    clear line;
+
+    shifts = load(temp1file);
+    data = load(temp2file);
+
+    y = data(:, 1);
+    x = data(:, 2);
+    raman_map = data(:, 3:end);
+
+    maps_acm{i} = raman_map;
+end
+fprintf('Fine mappe ACM\n');
+
+% Accorpa le mappe
+
+points_per_map = size(maps_acm{1}, 1);
+
+tot_iso = length(maps_iso);
+tot_acm = length(maps_acm);
+X = zeros(points_per_map * (tot_acm + tot_iso), length(shifts));
+
+% Prima le mappe ISO
+for i = 1:tot_iso
+    X( (points_per_map*(i-1) + 1):(points_per_map*i) , 1:end) = maps_iso{i};
+end
+
+% Poi quelle ACM
+for i = 1:tot_acm
+    X( (points_per_map*(i-1+tot_iso) + 1):(points_per_map*(i+tot_iso)) , 1:end) = maps_acm{i};
+end
+
+bundle_raw.X = X;
+bundle_raw.name = 'raw';
+bundle_raw.shifts = shifts;
+bundle_raw.points_per_map = points_per_map;
+bundle_raw.x = x;
+bundle_raw.y = y;
+bundle_raw.tot_iso = tot_iso * points_per_map;
+bundle_raw.tot_acm = tot_acm * points_per_map;
+
+clear data dir_acm dir_iso fid fid_temp1 fid_temp2 fname fullfname raman_map temp1file temp2file x y X shifts points_per_map i tot_acm tot_iso 
+
+fprintf('Dataset pronto\n');
+
+%% Accorpa i dataset
+
+dataset = [bundle_raw, bundle_fit];
+
+%% Applica i vari tipi di normalizzazioni
+
+normalization_types = {'range', 'norm', 'area'};
+
+dataset_normalized = struct([]);
+for i = 1:length(dataset)
+    for j = 1:length(normalization_types)
+        type = normalization_types{j};
+        
+        k = (i-1) * length(normalization_types) + j;
+        X = dataset(i).X;
+        shifts = dataset(i).shifts;
+        if isequal(type, 'area')
+            % Normalizza per l'area
+            
+            % Dividi ciascuno spettro per la rispettiva area
+            for spect = 1:size(X, 1)
+                x = X(spect, :);
+                X(spect, :) = x / trapz(shifts, x);
+            end
+        else
+            X = normalize(X, 2, type);
+        end
+
+        % Copia tutti i campi
+        for f = fieldnames(dataset(i))'
+            dataset_normalized(k).(f{1}) = dataset(i).(f{1});
+        end
+        % Aggiorna quelli presenti
+        dataset_normalized(k).X = X;
+        dataset_normalized(k).name = sprintf('%s-%s', dataset(i).name, type);
+    end
+end
+
+clear d_X d_name type i j k l
+
+whos dataset_normalized
+
+%% Applica la PCA e LDA combinate
+% La PCA viene eseguita senza rimuovere la media
+% Includi nel calcolo dell'LDA le prime 10 PC
+
+max_PC = 10;
+
+n = length(dataset_normalized);
+pca_results = struct([]);
+for i = 1:n
+    X = dataset_normalized(i).X;
+    name = dataset_normalized(i).name;
+    points_per_map = dataset_normalized(i).points_per_map;
+
+    fprintf('[%d/%d] Nome: %s\n', i, n, name);
+    
+    figure;
+    tiledlayout("flow");
+    sgtitle(name);
+
+    fprintf('[%d/%d] Applicando PCA\n', i, n);
+
+    [coeff, score, latent, ~, explained] = pca(X, 'Centered', 'off');
+
+    nexttile;
+    hold on;
+    grid on;
+    plot(dataset_normalized(i).shifts, coeff(:, 1:3));
+    legend('PC1', 'PC2', 'PC3', 'Location', 'best');
+    title('PC1, PC2 and PC3 loadings');
+    xlabel('shift [cm^{-1}]');
+    ylabel('coeff [a.u.]');
+
+    nexttile;
+    grid on;
+    hold on;
+    title('Explained variance of PCs');
+    bar(explained);
+    xlabel('PC index');
+    ylabel('Explained variance [%]');
+    set(gca, 'YScale', 'log');
+
+    tot_iso = dataset_normalized(i).tot_iso;
+    tot_acm = dataset_normalized(i).tot_acm;
+    
+    % Raggruppa i dati in un'unica matrice
+    % Utilizza le PC dalla 1 alla max_PC
+    Y = score(:, 1:max_PC);
+    
+    Y_iso = Y(1:tot_iso, :);
+    Y_acm = Y((tot_iso+1):end, :);
+
+    nexttile;
+    grid on;
+    hold on;
+    title('PC scores');
+    violinplot(Y_iso, 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75]);
+    violinplot(Y_acm, 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00]);
+    xlabel('PC index');
+    ylabel('PC score [a.u.]');
+
+    fprintf('[%d/%d] Applicando LDA\n', i, n);
+
+    % Crea una lista che indichi come separare i dati
+    classes = cell(tot_iso + tot_acm, 1);
+    for j = 1:tot_iso
+        classes{j} = 'iso';
+    end
+    for j = (tot_iso + 1):length(classes)
+        classes{j} = 'acm';
+    end
+
+    % Crea un classificatore lineare
+    classifier = fitcdiscr(Y, classes);
+
+    % Recupera i coefficienti e le costanti che danno origine al piano che
+    % separa le due classi
+    K = classifier.Coeffs(1, 2).Const;
+    L = classifier.Coeffs(1, 2).Linear;
+
+    % Genera la PCx
+    pcx_coeff = L' * coeff(:, 1:max_PC)';
+
+    nexttile;
+    grid on;
+    hold on;
+    plot(dataset_normalized(i).shifts, pcx_coeff);
+    title('PCx loadings');
+    xlabel('shift [cm^{-1}]');
+    ylabel('coeff [a.u.]');
+
+    pcx_scores_iso = L' * Y_iso' + K;
+    pcx_scores_acm = L' * Y_acm' + K;
+
+    nexttile;
+    grid on;
+    hold on;
+    title('PCx scores - global');
+    violinplot(pcx_scores_iso, 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75], 'DisplayName', 'H-CO');
+    violinplot(pcx_scores_acm, 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00], 'DisplayName', 'D-CO');
+    xlabel('PCx');
+    ylabel('PC score [a.u.]');
+    legend show;
+
+    nexttile;
+    grid on;
+    hold on;
+    title('PCx scores - by map');
+    for i_map = 1:(tot_iso / points_per_map)
+        violinplot(i_map * ones(1, points_per_map), pcx_scores_iso(((i_map-1) * points_per_map + 1):(i_map * points_per_map)), 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75]);
+        violinplot(i_map * ones(1, points_per_map), pcx_scores_acm(((i_map-1) * points_per_map + 1):(i_map * points_per_map)), 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00]);
+    end
+    xlabel('Map index');
+    ylabel('PC score [a.u.]');
+
+    % Vediamo quanto funziona il modello
+    are_acm_positive = mean(pcx_scores_acm) > 0;
+
+    if are_acm_positive
+        err_acm = sum(pcx_scores_acm < 0);
+        err_iso = sum(pcx_scores_iso > 0);
+    else
+        err_acm = sum(pcx_scores_acm > 0);
+        err_iso = sum(pcx_scores_iso < 0);
+    end
+
+    err_rate = (err_acm + err_iso) / (tot_iso + tot_acm);
+
+    % Aggiungi del testo riassuntivo
+    nexttile;
+    axis off;
+    
+    if are_acm_positive
+        acm_label = '+';
+    else
+        acm_label = '-';
+    end
+    
+    L_string = sprintf('%.2f ', L);
+
+    text(0, 1, ...
+        sprintf('Name: %s\nPC used for LDA: %d\nL = [%s]\nK = %.2f\nD-COs are: %s\nsuccess rate: %.2f%%\n', name, max_PC, L_string, K, acm_label, (1 - err_rate) * 100), ...
+        'HorizontalAlignment', 'left', 'VerticalAlignment', 'top', 'FontSize', 12);
+    
+    % Copia tutti i campi
+    for f = fieldnames(dataset_normalized(i))'
+        pca_results(i).(f{1}) = dataset_normalized(i).(f{1});
+    end
+    % Aggiungi gli altri
+    pca_results(i).coeff = coeff;
+    pca_results(i).score = score;
+    pca_results(i).latent = latent;
+    pca_results(i).explained = explained;
+    pca_results(i).max_PC = max_PC;
+    pca_results(i).L = L;
+    pca_results(i).K = K;
+    pca_results(i).pcx_coeff = pcx_coeff;
+    pca_results(i).pcx_scores = [pcx_scores_iso'; pcx_scores_acm'];
+    pca_results(i).acm_label = acm_label;
+    pca_results(i).err_rate = err_rate;
+end
+
+%% Plotta i PCx loadings calcolati tutti assieme
+
+figure;
+grid on;
+hold on;
+title('PCx loadings');
+xlabel('shift [cm^{-1}]');
+ylabel('coeff [a.u.]');
+legend('show', 'Location', 'best');
+
+for i = 1:length(pca_results)
+    plot(pca_results(i).shifts, normalize(pca_results(i).pcx_coeff, 'range', [-0.5 0.5]) + i, 'DisplayName', pca_results(i).name);
+end
+
+%% Testa il modello tenendo fuori tot spettri casuali
+
+n_excluded = 100;
+
+i = 1;
+
+% Fallo più volte e plotta i risultati
+n_repetitions = 100;
+
+err_rate_list = zeros(n_repetitions, 3);
+
+for rep = 1:n_repetitions
+    X = pca_results(i).X;
+
+    % Scegli quali sono gli spettri da rimuovere
+    % Genera una permutazione casuale degli indici della matrice X
+    perm = randperm(size(X, 1));
+    % Prendi solo i primi n
+    i_excluded = perm(1:n_excluded);
+    % Riordina il vettore
+    i_excluded = sort(i_excluded);
+
+    % Copiali in una matrice separata
+    X_excluded = X(i_excluded, :);
+
+    % Quelli che non sono stati passati alla matrice Y sono da tenere
+    i_included = sort(perm(n_excluded+1:end));
+    X_included = X(i_included, :);
+
+    [coeff, score, latent, ~, explained] = pca(X_included, 'Centered', 'off');
+
+    % Raggruppa i dati in un'unica matrice
+    % Utilizza le PC dalla 1 alla max_PC
+    Y = score(:, 1:pca_results(i).max_PC);
+
+    % Riconosci quali sono ISO e quali ACM
+    are_iso = i_included <= pca_results(i).tot_iso;
+
+    Y_iso = Y(are_iso, :);
+    Y_acm = Y(~are_iso, :);
+
+    tot_iso = size(Y_iso, 1);
+    tot_acm = size(Y_acm, 1);
+    % Crea una lista che indichi come separare i dati
+    classes = cell(tot_iso + tot_acm, 1);
+    for j = 1:tot_iso
+        classes{j} = 'iso';
+    end
+    for j = (tot_iso + 1):length(classes)
+        classes{j} = 'acm';
+    end
+
+    % Crea un classificatore lineare
+    classifier = fitcdiscr(Y, classes);
+
+    % Recupera i coefficienti e le costanti che danno origine al piano che
+    % separa le due classi
+    K = classifier.Coeffs(1, 2).Const;
+    L = classifier.Coeffs(1, 2).Linear;
+
+    % Genera la PCx
+    pcx_coeff = L' * coeff(:, 1:pca_results(i).max_PC)';
+
+    pcx_scores_iso = L' * Y_iso' + K;
+    pcx_scores_acm = L' * Y_acm' + K;
+
+    are_acm_positive = mean(pcx_scores_acm) > 0;
+
+    % Vediamo quanto funziona il modello
+    % Riconosci la classe di apparteneza degli spettri esclusi
+    are_iso_excluded = i_excluded <= pca_results(i).tot_iso;
+
+    % Applica il modello sugli spettri esclusi
+    pcx_scores_excluded = pcx_coeff * X_excluded' + K;
+
+    % Separa tra iso e acm
+    pcx_scores_excluded_iso = pcx_scores_excluded(are_iso_excluded);
+    pcx_scores_excluded_acm = pcx_scores_excluded(~are_iso_excluded);
+
+    % Conta quanti errori ci sono
+    if are_acm_positive
+        err_acm = sum(pcx_scores_excluded_acm < 0);
+        err_iso = sum(pcx_scores_excluded_iso > 0);
+    else
+        err_acm = sum(pcx_scores_excluded_acm > 0);
+        err_iso = sum(pcx_scores_excluded_iso < 0);
+    end
+
+    err_rate = (err_acm + err_iso) / (n_excluded);
+
+    % Salva i risultati
+    err_rate_list(rep, 1) = err_iso / length(pcx_scores_excluded_iso);
+    err_rate_list(rep, 2) = err_acm / length(pcx_scores_excluded_acm);
+    err_rate_list(rep, 3) = err_rate;
+
+    fprintf('[%d/%d]\n', rep, n_repetitions);
+end
+
+mean_err_acm = mean(err_rate_list(:, 2));
+mean_err_iso = mean(err_rate_list(:, 1));
+mean_err = mean(err_rate_list(:, 3));
+
+figure;
+tiledlayout('flow')
+sgtitle(sprintf('%d spectra excluded - %s', n_excluded, pca_results(i).name))
+
+nexttile;
+title('False negatives');
+grid on;
+hold on;
+xlabel('Repetition index');
+ylabel('Percentage [%]');
+bar(1:n_repetitions, err_rate_list(:, 2)*100, 'FaceAlpha', 0.65, 'FaceColor', [0.87 0.33 0.00]);
+yline(mean_err_acm*100, 'LineWidth', 2);
+
+nexttile;
+title('False positives');
+grid on;
+hold on;
+xlabel('Repetition index');
+ylabel('Percentage [%]');
+bar(1:n_repetitions, err_rate_list(:, 1)*100, 'FaceAlpha', 0.65);
+yline(mean_err_iso*100, 'LineWidth', 2);
+
+nexttile;
+title('Success rate');
+grid on;
+hold on;
+xlabel('Repetition index');
+ylabel('Percentage [%]');
+bar(1:n_repetitions, (1 - err_rate_list(:, 3))*100, 'FaceAlpha', 0.65, 'FaceColor', [0.87 0.33 0.00]);
+yline((1 - mean_err)*100, 'LineWidth', 2);
+
+nexttile;
+axis off;
+text(0, 1, ...
+        sprintf('Name: %s\nPC used for LDA: %d\nN° of spectra excluded: %d\nN° of repetitions: %d\nFalse negatives: %.2f%%\nFalse positives: %.2f%%\nSuccess rate: %.2f%%\n', name, pca_results(i).max_PC, n_excluded, n_repetitions, mean_err_acm * 100, mean_err_iso * 100, (1 - mean_err) * 100), ...
+        'HorizontalAlignment', 'left', 'VerticalAlignment', 'top', 'FontSize', 12);
+
+%% Testa il modello tenendo fuori una coppia di mappe alla volta
+
+i = 2;
+
+points_per_map = pca_results(i).points_per_map;
+n_maps = pca_results(i).tot_iso / points_per_map;
+
+err_rate_list = zeros(n_maps, 3);
+pcx_coeff_list = zeros(n_maps, length(pca_results(i).pcx_coeff));
+pcx_scores_included_iso_list = zeros(n_maps, pca_results(i).tot_iso - points_per_map);
+pcx_scores_included_acm_list = zeros(n_maps, pca_results(i).tot_acm - points_per_map);
+pcx_scores_excluded_iso_list = zeros(n_maps, points_per_map);
+pcx_scores_excluded_acm_list = zeros(n_maps, points_per_map);
+
+fprintf('Working on "%s"\n', pca_results(i).name);
+for i_map = 1:n_maps
+    % fprintf('[%d/%d] Removed "%s" and "%s"\n', i_map, n_maps, files_iso{i_map}, files_acm{i_map});
+    
+    X = pca_results(i).X;
+    
+    fprintf('[%d/%d] Removing spectra from %d to %d and from %d to %d\n', i_map, n_maps, ((i_map - 1) * points_per_map + 1), (i_map * points_per_map), ((i_map - 1) * points_per_map + 1 + pca_results(i).tot_iso), (i_map * points_per_map + pca_results(i).tot_iso));
+    % Scegli quali sono gli spettri da rimuovere
+    i_excluded_iso = ((i_map - 1) * points_per_map + 1):(i_map * points_per_map);
+    i_excluded_acm = ((i_map - 1) * points_per_map + 1 + pca_results(i).tot_iso):(i_map * points_per_map + pca_results(i).tot_iso);
+    
+    % Copiali in una matrice separata
+    X_excluded_iso = X(i_excluded_iso, :);
+    X_excluded_acm = X(i_excluded_acm, :);
+
+    % Cerca quali sono gli spettri da tenere
+    are_included = 1:(pca_results(i).tot_iso + pca_results(i).tot_acm);
+    are_included = ~(ismember(are_included, i_excluded_iso) | ismember(are_included, i_excluded_acm));
+
+    % Estrai gli spettri da includere
+    X_included = X(are_included, :);
+    
+    % Applica la PCA
+    [coeff, score, latent, ~, explained] = pca(X_included, 'Centered', 'off');
+
+    % Raggruppa i dati in un'unica matrice
+    % Utilizza le PC dalla 1 alla max_PC
+    Y = score(:, 1:pca_results(i).max_PC);
+
+    % Riconosci quali sono ISO e quali ACM
+    are_iso = (1:size(Y, 1)) <= (pca_results(i).tot_iso - points_per_map);
+
+    Y_iso = Y(are_iso, :);
+    Y_acm = Y(~are_iso, :);
+
+    tot_iso = size(Y_iso, 1);
+    tot_acm = size(Y_acm, 1);
+    % Crea una lista che indichi come separare i dati
+    classes = cell(tot_iso + tot_acm, 1);
+    for j = 1:tot_iso
+        classes{j} = 'iso';
+    end
+    for j = (tot_iso + 1):length(classes)
+        classes{j} = 'acm';
+    end
+
+    % Crea un classificatore lineare
+    classifier = fitcdiscr(Y, classes);
+
+    % Recupera i coefficienti e le costanti che danno origine al piano che
+    % separa le due classi
+    K = classifier.Coeffs(1, 2).Const;
+    L = classifier.Coeffs(1, 2).Linear;
+
+    % Genera la PCx
+    pcx_coeff = L' * coeff(:, 1:pca_results(i).max_PC)';
+    
+    pcx_scores_iso = pcx_coeff * X_included(are_iso, :)' + K;
+    pcx_scores_acm = pcx_coeff * X_included(~are_iso, :)' + K;
+    are_acm_positive = mean(pcx_scores_acm) > 0;
+
+    % Vediamo quanto funziona il modello
+
+    % Applica il modello sugli spettri esclusi
+    pcx_scores_excluded_iso = pcx_coeff * X_excluded_iso' + K;
+    pcx_scores_excluded_acm = pcx_coeff * X_excluded_acm' + K;
+
+    % Conta quanti errori ci sono
+    if are_acm_positive
+        err_acm = sum(pcx_scores_excluded_acm < 0);
+        err_iso = sum(pcx_scores_excluded_iso > 0);
+    else
+        err_acm = sum(pcx_scores_excluded_acm > 0);
+        err_iso = sum(pcx_scores_excluded_iso < 0);
+    end
+
+    err_rate = (err_acm + err_iso) / (length(pcx_scores_excluded_iso) + length(pcx_scores_excluded_acm));
+
+    % Salva i risultati
+    err_rate_list(i_map, 1) = err_iso / length(pcx_scores_excluded_iso);
+    err_rate_list(i_map, 2) = err_acm / length(pcx_scores_excluded_acm);
+    err_rate_list(i_map, 3) = err_rate;
+
+    pcx_coeff_list(i_map, :) = pcx_coeff;
+    
+    pcx_scores_included_iso_list(i_map, :) = pcx_scores_iso;
+    pcx_scores_included_acm_list(i_map, :) = pcx_scores_acm;
+
+    pcx_scores_excluded_iso_list(i_map, :) = pcx_scores_excluded_iso;
+    pcx_scores_excluded_acm_list(i_map, :) = pcx_scores_excluded_acm;
+end
+
+mean_err_acm = mean(err_rate_list(:, 2));
+mean_err_iso = mean(err_rate_list(:, 1));
+mean_err = mean(err_rate_list(:, 3));
+
+figure;
+tiledlayout('flow')
+sgtitle(sprintf('%s - 1 pair of maps excluded', pca_results(i).name))
+
+nexttile;
+grid on;
+hold on;
+title('PCx scores of the maps included - global');
+xlabel('Map removed');
+ylabel('PC score [a.u.]');
+for i_map = 1:n_maps
+    violinplot(i_map * ones(1, size(pcx_scores_included_iso_list, 2)), pcx_scores_included_iso_list(i_map, :), 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75]);
+    violinplot(i_map * ones(1, size(pcx_scores_included_iso_list, 2)), pcx_scores_included_acm_list(i_map, :), 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00]);
+end
+
+% nexttile;
+% grid on;
+% hold on;
+% title('PCx scores of the maps included - by map');
+% xlabel('Map removed');
+% ylabel('PC score [a.u.]');
+% for i_map = 1:n_maps
+%     violinplot(i_map * ones(1, size(pcx_scores_included_iso_list, 2)), pcx_scores_included_iso_list(i_map, :), 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75]);
+%     violinplot(i_map * ones(1, size(pcx_scores_included_iso_list, 2)), pcx_scores_included_acm_list(i_map, :), 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00]);
+% end
+
+nexttile;
+grid on;
+hold on;
+title('PCx scores of the map removed');
+xlabel('Map removed');
+ylabel('PC score [a.u.]');
+for i_map = 1:n_maps
+    violinplot(i_map * ones(1, points_per_map), pcx_scores_excluded_iso_list(i_map, :), 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75]);
+    violinplot(i_map * ones(1, points_per_map), pcx_scores_excluded_acm_list(i_map, :), 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00]);
+end
+
+nexttile;
+grid on;
+hold on;
+title('PCx loadings');
+xlabel('shift [cm^{-1}]');
+ylabel('coeff [a.u.]');
+legend('show', 'Location', 'best');
+
+for i_map = 1:n_maps
+    % plot(pca_results(i).shifts, normalize(pcx_coeff_list(i_map, :), 'range', [-0.5 0.5]) + i_map, 'DisplayName', sprintf('Without map %d', i_map));
+    plot(pca_results(i).shifts, pcx_coeff_list(i_map, :) + i_map, 'DisplayName', sprintf('Without map %d', i_map));
+end
+
+nexttile;
+title('False negatives');
+grid on;
+hold on;
+xlabel('Map removed');
+ylabel('Percentage [%]');
+bar(1:n_maps, err_rate_list(:, 2)*100, 'FaceAlpha', 0.65, 'FaceColor', [0.87 0.33 0.00]);
+yline(mean_err_acm*100, 'LineWidth', 2);
+
+nexttile;
+title('False positives');
+grid on;
+hold on;
+xlabel('Map removed');
+ylabel('Percentage [%]');
+bar(1:n_maps, err_rate_list(:, 1)*100, 'FaceAlpha', 0.65);
+yline(mean_err_iso*100, 'LineWidth', 2);
+
+nexttile;
+title('Success rate');
+grid on;
+hold on;
+xlabel('Map removed');
+ylabel('Percentage [%]');
+bar(1:n_maps, (1 - err_rate_list(:, 3))*100, 'FaceAlpha', 0.65, 'FaceColor', [0.23 0.67 0.20]);
+yline((1 - mean_err)*100, 'LineWidth', 2);
+
+nexttile;
+axis off;
+text(0, 1, ...
+        sprintf('Name: %s\nPC used for LDA: %d\nN° of repetitions: %d\nFalse negatives: %.2f%%\nFalse positives: %.2f%%\nSuccess rate: %.2f%%\n', pca_results(i).name, pca_results(i).max_PC, n_maps, mean_err_acm * 100, mean_err_iso * 100, (1 - mean_err) * 100), ...
+        'HorizontalAlignment', 'left', 'VerticalAlignment', 'top', 'FontSize', 12);
+
+%% Proviamo il savo-approccio
+
+i = 3;
+
+points_per_map = pca_results(i).points_per_map;
+n_maps = pca_results(i).tot_iso / points_per_map;
+
+err_rate_list = zeros(n_maps, 3);
+pcx_coeff_list = zeros(n_maps, length(pca_results(i).pcx_coeff));
+pcx_scores_included_iso_list = zeros(n_maps, pca_results(i).tot_iso - points_per_map);
+pcx_scores_included_acm_list = zeros(n_maps, pca_results(i).tot_acm - points_per_map);
+pcx_scores_excluded_iso_list = zeros(n_maps, points_per_map);
+pcx_scores_excluded_acm_list = zeros(n_maps, points_per_map);
+
+fprintf('Working on "%s"\n', pca_results(i).name);
+for i_map = 1:n_maps
+    % fprintf('[%d/%d] Removed "%s" and "%s"\n', i_map, n_maps, files_iso{i_map}, files_acm{i_map});
+    
+    X = pca_results(i).X;
+    
+    fprintf('[%d/%d] Removing spectra from %d to %d and from %d to %d\n', i_map, n_maps, ((i_map - 1) * points_per_map + 1), (i_map * points_per_map), ((i_map - 1) * points_per_map + 1 + pca_results(i).tot_iso), (i_map * points_per_map + pca_results(i).tot_iso));
+    % Scegli quali sono gli spettri da rimuovere
+    i_excluded_iso = ((i_map - 1) * points_per_map + 1):(i_map * points_per_map);
+    i_excluded_acm = ((i_map - 1) * points_per_map + 1 + pca_results(i).tot_iso):(i_map * points_per_map + pca_results(i).tot_iso);
+    
+    % Copiali in una matrice separata
+    X_excluded_iso = X(i_excluded_iso, :);
+    X_excluded_acm = X(i_excluded_acm, :);
+
+    % Cerca quali sono gli spettri da tenere
+    are_included = 1:(pca_results(i).tot_iso + pca_results(i).tot_acm);
+    are_included = ~(ismember(are_included, i_excluded_iso) | ismember(are_included, i_excluded_acm));
+
+    % Estrai gli spettri da includere
+    X_included = X(are_included, :);
+    
+    % Separa tra ISO e ACM
+    are_iso = (1:size(X_included, 1)) <= (pca_results(i).tot_iso - points_per_map);
+    X_included_iso = X_included(are_iso, :);
+    X_included_acm = X_included(~are_iso, :);
+    
+    % Esegui la PCA prima sugli ISO e poi sugli ACM
+    [coeff_iso, score_iso, latent_iso, ~, explained_iso] = pca(X_included_iso, 'Centered', 'off');
+    [coeff_acm, score_acm, latent_acm, ~, explained_acm] = pca(X_included_acm, 'Centered', 'off');
+    
+    % Crea la nuova matrice dei coefficienti mettendo prima le prime PC
+    % degli ISO e poi quelle degli ACM
+    coeff = [coeff_iso(:, 1:pca_results(i).max_PC), coeff_acm(:, 1:pca_results(i).max_PC)];
+
+    % Ora calcola gli score
+    Y_iso = X_included_iso * coeff;
+    Y_acm = X_included_acm * coeff;
+
+    tot_iso = size(Y_iso, 1);
+    tot_acm = size(Y_acm, 1);
+    % Crea una lista che indichi come separare i dati
+    classes = cell(tot_iso + tot_acm, 1);
+    for j = 1:tot_iso
+        classes{j} = 'iso';
+    end
+    for j = (tot_iso + 1):length(classes)
+        classes{j} = 'acm';
+    end
+
+    % Crea un classificatore lineare
+    classifier = fitcdiscr([Y_iso; Y_acm], classes);
+
+    % Recupera i coefficienti e le costanti che danno origine al piano che
+    % separa le due classi
+    K = classifier.Coeffs(1, 2).Const;
+    L = classifier.Coeffs(1, 2).Linear;
+
+    % Genera la PCx
+    pcx_coeff = L' * coeff';
+    
+    pcx_scores_iso = pcx_coeff * X_included_iso' + K;
+    pcx_scores_acm = pcx_coeff * X_included_acm' + K;
+    are_acm_positive = mean(pcx_scores_acm) > 0;
+
+    % Vediamo quanto funziona il modello
+
+    % Applica il modello sugli spettri esclusi
+    pcx_scores_excluded_iso = pcx_coeff * X_excluded_iso' + K;
+    pcx_scores_excluded_acm = pcx_coeff * X_excluded_acm' + K;
+
+    % Conta quanti errori ci sono
+    if are_acm_positive
+        err_acm = sum(pcx_scores_excluded_acm < 0);
+        err_iso = sum(pcx_scores_excluded_iso > 0);
+    else
+        err_acm = sum(pcx_scores_excluded_acm > 0);
+        err_iso = sum(pcx_scores_excluded_iso < 0);
+    end
+
+    err_rate = (err_acm + err_iso) / (length(pcx_scores_excluded_iso) + length(pcx_scores_excluded_acm));
+
+    % Salva i risultati
+    err_rate_list(i_map, 1) = err_iso / length(pcx_scores_excluded_iso);
+    err_rate_list(i_map, 2) = err_acm / length(pcx_scores_excluded_acm);
+    err_rate_list(i_map, 3) = err_rate;
+
+    pcx_coeff_list(i_map, :) = pcx_coeff;
+    
+    pcx_scores_included_iso_list(i_map, :) = pcx_scores_iso;
+    pcx_scores_included_acm_list(i_map, :) = pcx_scores_acm;
+
+    pcx_scores_excluded_iso_list(i_map, :) = pcx_scores_excluded_iso;
+    pcx_scores_excluded_acm_list(i_map, :) = pcx_scores_excluded_acm;
+end
+
+mean_err_acm = mean(err_rate_list(:, 2));
+mean_err_iso = mean(err_rate_list(:, 1));
+mean_err = mean(err_rate_list(:, 3));
+
+figure;
+tiledlayout('flow')
+sgtitle(sprintf('%s - savoapproccio', pca_results(i).name))
+
+nexttile;
+grid on;
+hold on;
+title('PCx scores of the maps included - global');
+xlabel('Map removed');
+ylabel('PC score [a.u.]');
+for i_map = 1:n_maps
+    violinplot(i_map * ones(1, size(pcx_scores_included_iso_list, 2)), pcx_scores_included_iso_list(i_map, :), 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75]);
+    violinplot(i_map * ones(1, size(pcx_scores_included_iso_list, 2)), pcx_scores_included_acm_list(i_map, :), 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00]);
+end
+
+% nexttile;
+% grid on;
+% hold on;
+% title('PCx scores of the maps included - by map');
+% xlabel('Map removed');
+% ylabel('PC score [a.u.]');
+% for i_map = 1:n_maps
+%     violinplot(i_map * ones(1, size(pcx_scores_included_iso_list, 2)), pcx_scores_included_iso_list(i_map, :), 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75]);
+%     violinplot(i_map * ones(1, size(pcx_scores_included_iso_list, 2)), pcx_scores_included_acm_list(i_map, :), 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00]);
+% end
+
+nexttile;
+grid on;
+hold on;
+title('PCx scores of the map removed');
+xlabel('Map removed');
+ylabel('PC score [a.u.]');
+for i_map = 1:n_maps
+    violinplot(i_map * ones(1, points_per_map), pcx_scores_excluded_iso_list(i_map, :), 'DensityDirection', 'negative', 'FaceColor', [0.07 0.44 0.75]);
+    violinplot(i_map * ones(1, points_per_map), pcx_scores_excluded_acm_list(i_map, :), 'DensityDirection', 'positive', 'FaceColor', [0.87 0.33 0.00]);
+end
+
+nexttile;
+grid on;
+hold on;
+title('PCx loadings');
+xlabel('shift [cm^{-1}]');
+ylabel('coeff [a.u.]');
+legend('show', 'Location', 'best');
+
+for i_map = 1:n_maps
+    plot(pca_results(i).shifts, normalize(pcx_coeff_list(i_map, :), 'range', [-0.5 0.5]) + i_map, 'DisplayName', sprintf('Without map %d', i_map));
+end
+
+nexttile;
+title('False negatives');
+grid on;
+hold on;
+xlabel('Map removed');
+ylabel('Percentage [%]');
+bar(1:n_maps, err_rate_list(:, 2)*100, 'FaceAlpha', 0.65, 'FaceColor', [0.87 0.33 0.00]);
+yline(mean_err_acm*100, 'LineWidth', 2);
+
+nexttile;
+title('False positives');
+grid on;
+hold on;
+xlabel('Map removed');
+ylabel('Percentage [%]');
+bar(1:n_maps, err_rate_list(:, 1)*100, 'FaceAlpha', 0.65);
+yline(mean_err_iso*100, 'LineWidth', 2);
+
+nexttile;
+title('Success rate');
+grid on;
+hold on;
+xlabel('Map removed');
+ylabel('Percentage [%]');
+bar(1:n_maps, (1 - err_rate_list(:, 3))*100, 'FaceAlpha', 0.65, 'FaceColor', [0.23 0.67 0.20]);
+yline((1 - mean_err)*100, 'LineWidth', 2);
+
+nexttile;
+axis off;
+text(0, 1, ...
+        sprintf('Name: %s\nPC used for LDA: %d\nN° of repetitions: %d\nFalse negatives: %.2f%%\nFalse positives: %.2f%%\nSuccess rate: %.2f%%\n', pca_results(i).name, pca_results(i).max_PC, n_maps, mean_err_acm * 100, mean_err_iso * 100, (1 - mean_err) * 100), ...
+        'HorizontalAlignment', 'left', 'VerticalAlignment', 'top', 'FontSize', 12);
